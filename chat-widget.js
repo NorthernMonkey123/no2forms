@@ -1,5 +1,6 @@
 // File: chat-widget.js
 (function () {
+  // ---------- Styles ----------
   const style = document.createElement("style");
   style.textContent = `
     .n2f-fab { position: fixed; right: 20px; bottom: 20px; width: 56px; height: 56px;
@@ -33,6 +34,7 @@
   `;
   document.head.appendChild(style);
 
+  // ---------- DOM ----------
   const fab = document.createElement("button");
   fab.className = "n2f-fab";
   fab.title = "Chat with no2forms";
@@ -59,6 +61,7 @@
   const input = panel.querySelector("input");
   const sendBtn = panel.querySelector("button");
 
+  // ---------- Helpers ----------
   const appendMsg = (text, who) => {
     const div = document.createElement("div");
     div.className = `n2f-msg ${who === "user" ? "n2f-user" : "n2f-bot"}`;
@@ -68,32 +71,14 @@
     return div;
   };
 
-  // ---------- Booking state machine ----------
-  const State = { IDLE:"idle", EMAIL:"email", TIME:"time", NAME:"name" };
-  let mode = State.IDLE;
-  const booking = { email:"", time:"", name:"" };
-  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
-  const bookingIntent = (t) => /\b(book|booking|demo|call|meeting|schedule|talk|chat)\b/i.test(t);
-
-  const resetBooking = () => { mode = State.IDLE; booking.email=""; booking.time=""; booking.name=""; removePicker(); };
-
-  const startBooking = () => {
-    mode = State.EMAIL;
-    appendMsg("Great — let’s get you booked (no forms). What’s your email address?", "bot");
-  };
-
   // ---------- Mini date/time picker ----------
   let pickerEl = null;
-
   function removePicker() {
     if (pickerEl && pickerEl.parentNode) pickerEl.parentNode.removeChild(pickerEl);
     pickerEl = null;
     input.disabled = false;
-    sendBtn.disabled = false;
   }
-
   function pad(n){ return String(n).padStart(2,"0"); }
-
   function addMinutes(hhmm, minutes) {
     const [h, m] = hhmm.split(":").map(Number);
     const total = h*60 + m + minutes;
@@ -101,19 +86,15 @@
     const em = total % 60;
     return `${pad(eh)}:${pad(em)}`;
   }
-
   function weekdayAndDM(date) {
     const d = new Date(date + "T00:00:00");
     const wk = d.toLocaleDateString("en-GB", { weekday: "short" });
     const dm = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
     return `${wk} ${dm}`;
-    // We’ll suffix "UK" later to signal timezone.
   }
-
-  function showTimePicker() {
-    // Disable bottom input while picker open
+  function showTimePicker(opts) {
+    // opts: { onConfirm(label), onCancel() }
     input.disabled = true;
-
     const container = document.createElement("div");
     container.className = "n2f-picker";
 
@@ -140,13 +121,10 @@
         <button id="n2f-confirm">Confirm</button>
         <button id="n2f-cancel">Cancel</button>
       </div>
-      <div style="font-size:12px;opacity:.8">Times assumed Europe/London (UK). You can tell me another timezone if needed.</div>
+      <div style="font-size:12px;opacity:.8">Times assumed Europe/London (UK). Tell me another timezone if needed.</div>
     `;
-
-    // attach under last bot message (or at end)
-    const anchor = messages;
     pickerEl = container;
-    anchor.appendChild(container);
+    messages.appendChild(container);
     messages.scrollTop = messages.scrollHeight;
 
     const dateEl = container.querySelector("#n2f-date");
@@ -162,22 +140,24 @@
       if (!d || !s) { appendMsg("Please choose a date and start time.", "bot"); return; }
       const end = addMinutes(s, dur);
       const label = `${weekdayAndDM(d)}, ${s}–${end} UK`;
-      booking.time = label;
       removePicker();
-      mode = State.NAME;
-      appendMsg(`Great — noted **${label}**. Do you want to share your name (optional)?`, "bot");
+      opts?.onConfirm?.(label);
     });
-
     cancelBtn.addEventListener("click", () => {
       removePicker();
-      appendMsg("No worries — booking cancelled. How else can I help?", "bot");
-      resetBooking();
+      opts?.onCancel?.();
     });
   }
 
-  // ---------- LLM Q&A (short memory) ----------
-  const history = [];
-  const askLLM = async () => {
+  // ---------- Conversation state ----------
+  const history = []; // messages for LLM: [{role:"user"|"assistant", content:"..."}]
+  const State = { IDLE:"idle", BOOKING:"booking" };
+  let state = State.IDLE;
+  let slots = { email:"", time:"", name:"" }; // local mirror of server "slots"
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
+  // ---------- API calls ----------
+  const askAgent = async () => {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -185,10 +165,35 @@
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Request failed");
-    const reply = data.reply || "";
-    appendMsg(reply, "bot");
-    history.push({ role: "assistant", content: reply });
+    return data; // {mode, reply, missing, slots}
   };
+
+  async function notifyAndReset(finalSlots) {
+    try {
+      const nres = await fetch("/api/notify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: finalSlots.email || slots.email,
+          time: finalSlots.time || slots.time,
+          name: finalSlots.name || slots.name || "",
+          notes: "Collected via AI agent flow on no2forms.com",
+        }),
+      });
+      if (nres.ok) {
+        appendMsg("✅ All set — I’ve sent the details. You’ll get a confirmation shortly. Anything else I can help with?", "bot");
+      } else {
+        appendMsg("I couldn’t log that automatically, but I’ve saved your details and we’ll follow up by email.", "bot");
+      }
+    } catch (err) {
+      console.error("notify error", err);
+      appendMsg("I hit a hiccup sending the booking, but your details are captured. We’ll confirm by email.", "bot");
+    } finally {
+      state = State.IDLE;
+      slots = { email:"", time:"", name:"" };
+      removePicker();
+    }
+  }
 
   // ---------- Send handler ----------
   const onSend = async () => {
@@ -198,91 +203,93 @@
     appendMsg(text, "user");
     input.value = "";
 
-    // Cancel booking flow
-    if (/^\s*cancel\s*$/i.test(text) && mode !== State.IDLE) {
+    // cancel booking flow
+    if (/^\s*cancel\s*$/i.test(text) && state === State.BOOKING) {
+      state = State.IDLE;
+      slots = { email:"", time:"", name:"" };
+      removePicker();
       appendMsg("Booking cancelled. How else can I help?", "bot");
-      resetBooking();
       return;
     }
 
-    if (mode === State.EMAIL) {
-      // Try to extract email even if mixed with other words
-      const parts = text.split(/\s+/);
-      const candidate = parts.find((p) => emailRe.test(p));
-      if (!candidate) {
-        appendMsg("Could you share a valid email address?", "bot");
-        return;
-      }
-      booking.email = candidate;
-      mode = State.TIME;
-      appendMsg("Thanks! Pick a time that suits you:", "bot");
-      showTimePicker();
-      return;
-    }
+    // push user msg to history
+    history.push({ role: "user", content: text });
 
-    if (mode === State.TIME) {
-      // If user typed a time instead of using picker, accept it
-      if (/\d/.test(text)) {
-        booking.time = text.trim();
-        mode = State.NAME;
-        appendMsg("Got it — do you want to share your name (optional)?", "bot");
-      } else {
-        appendMsg("You can use the picker above or type a time like “Thu 3–5pm UK”.", "bot");
-      }
-      return;
-    }
-
-    if (mode === State.NAME) {
-      booking.name = text.trim();
-      // Send to backend
-      try {
-        const nres = await fetch("/api/notify", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            email: booking.email,
-            time: booking.time,
-            name: booking.name || "",
-            notes: "Collected via mini calendar flow on no2forms.com",
-          }),
-        });
-        if (nres.ok) {
-          appendMsg("✅ All set — I’ve sent the details. You’ll get a confirmation shortly. Anything else I can help with?", "bot");
-        } else {
-          appendMsg("I couldn’t log that automatically, but I’ve saved your details and we’ll follow up by email.", "bot");
-        }
-      } catch (e) {
-        console.error("notify error", e);
-        appendMsg("I hit a hiccup sending the booking, but your details are captured. We’ll confirm by email.", "bot");
-      } finally {
-        resetBooking();
-      }
-      return;
-    }
-
-    // Not booking → detect intent
-    if (bookingIntent(text)) {
-      mode = State.EMAIL;
-      appendMsg("Great — let’s get you booked (no forms). What’s your email address?", "bot");
-      return;
-    }
-
-    // Normal Q&A via LLM
     try {
-      history.push({ role: "user", content: text });
-      await askLLM();
+      const agent = await askAgent(); // {mode, reply, missing, slots}
+      if (agent.slots && typeof agent.slots === "object") {
+        // merge any extracted slots (e.g., email pulled from text)
+        slots = { ...slots, ...agent.slots };
+      }
+
+      if (agent.reply) {
+        appendMsg(agent.reply, "bot");
+        history.push({ role: "assistant", content: agent.reply });
+      }
+
+      if (agent.mode === "booking") {
+        state = State.BOOKING;
+
+        // enforce email format if model thinks it has one but it's invalid
+        if (slots.email && !emailRe.test(slots.email)) slots.email = "";
+
+        // Decide next UI action based on missing field:
+        if (agent.missing === "email" && !slots.email) {
+          // Do nothing special; user will type email next turn and model will re-evaluate.
+          return;
+        }
+        if (agent.missing === "time" && !slots.time) {
+          // Show mini picker to supply time deterministically
+          showTimePicker({
+            onConfirm: async (label) => {
+              slots.time = label;
+              history.push({ role: "user", content: `Time chosen: ${label}` });
+              const follow = await askAgent();
+              if (follow.reply) {
+                appendMsg(follow.reply, "bot");
+                history.push({ role: "assistant", content: follow.reply });
+              }
+              const s = follow.slots || slots;
+              if (follow.missing === null && (s.email || slots.email) && (s.time || slots.time)) {
+                await notifyAndReset(s);
+              }
+            },
+            onCancel: () => {
+              appendMsg("No worries — booking cancelled. How else can I help?", "bot");
+              state = State.IDLE;
+              slots = { email:"", time:"", name:"" };
+            }
+          });
+          return;
+        }
+        if (agent.missing === "name") {
+          // name is optional; we'll just wait for user input, then model will confirm
+          return;
+        }
+        // missing === null => we have enough to notify
+        if (agent.missing === null && (slots.email || agent.slots?.email) && (slots.time || agent.slots?.time)) {
+          await notifyAndReset(agent.slots || slots);
+          return;
+        }
+      } else {
+        state = State.IDLE;
+      }
     } catch (e) {
       console.error(e);
-      appendMsg("Sorry — something went wrong. Please try again.", "bot");
+      appendMsg(
+        "I’m here to help explain no2forms and book a quick call. Ask me anything — or say “book a demo” and I’ll schedule it (no forms).",
+        "bot"
+      );
+      history.push({ role: "assistant", content: "I’m here to help explain no2forms and book a quick call. Ask me anything — or say “book a demo” and I’ll schedule it (no forms)." });
     }
   };
 
-  // ---------- UI events ----------
+  // ---------- UI Events ----------
   fab.addEventListener("click", () => {
     panel.style.display = panel.style.display === "flex" ? "none" : "flex";
     panel.style.flexDirection = "column";
     if (panel.style.display === "flex" && messages.childElementCount === 0) {
-      const welcome = "Hi! I’m the no2forms assistant. Say “book a demo” to schedule via this chat (no forms). Type ‘cancel’ to exit booking.";
+      const welcome = "Hi! I’m the no2forms assistant. Ask anything — or say “book a demo” and I’ll sort it (no forms). Type ‘cancel’ to exit booking.";
       appendMsg(welcome, "bot");
       history.push({ role: "assistant", content: welcome });
     }
@@ -291,4 +298,3 @@
   sendBtn.addEventListener("click", onSend);
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") onSend(); });
 })();
-
