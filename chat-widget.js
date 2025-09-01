@@ -157,16 +157,23 @@
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
   // ---------- API calls ----------
-  const askAgent = async () => {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ messages: history }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Request failed");
-    return data; // {mode, reply, missing, slots}
-  };
+ const askAgent = async () => {
+  const res = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ messages: history }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Request failed");
+
+  // Defensive: if server is still returning legacy { reply: "..." }
+  if (typeof data?.reply === "string" && !data.mode) {
+    return { mode: "chat", reply: data.reply, missing: null, slots: { email:"", time:"", name:"" } };
+  }
+
+  return data; // expected: { mode, reply, missing, slots }
+};
+
 
   async function notifyAndReset(finalSlots) {
     try {
