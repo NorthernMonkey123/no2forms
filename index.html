@@ -215,7 +215,7 @@
     document.getElementById('y').textContent = new Date().getFullYear();
   </script>
 
-  <!-- Say no 2 rotator (dynamic heading, merged Add/Submit button) -->
+  <!-- Say no 2 rotator (dynamic heading) -->
   <script>
     (function () {
       const rotator = document.getElementById('n2-rotator');
@@ -223,16 +223,26 @@
       const input   = document.getElementById('n2-input');
 
       const basePhrases = [
-        "forms","friction","waiting on hold","endless sign-up hoops","CAPTCHAs",
-        "‘we’ll get back to you’","meeting overload","spammy popups","busywork"
+        "forms",
+        "friction",
+        "waiting on hold",
+        "endless sign-up hoops",
+        "CAPTCHAs",
+        "‘we’ll get back to you’",
+        "meeting overload",
+        "spammy popups",
+        "busywork"
       ];
 
+      // poll store will feed back here
       function getPollItems() {
         try { return JSON.parse(localStorage.getItem('n2-poll') || '[]'); }
         catch { return []; }
       }
+
       function getPhraseSet() {
         const extras = getPollItems().map(p => p.label);
+        // unique list with base first
         const set = [...basePhrases];
         for (const e of extras) if (!set.includes(e)) set.push(e);
         return set;
@@ -243,58 +253,232 @@
 
       function set(text) {
         rotator.style.opacity = 0;
-        setTimeout(() => { rotator.textContent = text || "placeholder"; rotator.style.opacity = 1; }, 120);
+        setTimeout(() => {
+          rotator.textContent = text || "placeholder";
+          rotator.style.opacity = 1;
+        }, 120);
       }
-      function next() { phrases = getPhraseSet(); i = (i + 1) % phrases.length; set(phrases[i]); }
-      function start() { if (timer) clearInterval(timer); timer = setInterval(next, 2000); }
 
-      window.__n2AddToRotator = function(label) { phrases = getPhraseSet(); set(label); start(); };
+      function next() {
+        phrases = getPhraseSet();
+        i = (i + 1) % phrases.length;
+        set(phrases[i]);
+      }
 
+      function start() {
+        if (timer) clearInterval(timer);
+        timer = setInterval(next, 2000);
+      }
+
+      // exposed so poll can push new entries into the cycle
+      window.__n2AddToRotator = function(label) {
+        phrases = getPhraseSet();
+        set(label);
+        start();
+      };
+
+      // input UX
       function queueUserPhrase(raw) {
         const t = (raw || "").trim();
         if (!t) return;
         const clean = t.replace(/^say\s*no\s*2\s*/i, "").slice(0, 50);
         if (!clean) return;
-        window.__n2UpsertPollItem(clean, +1);
+        window.__n2UpsertPollItem(clean, +1); // create with +1 vote
         window.__n2Confetti && window.__n2Confetti();
         window.__n2AddToRotator(clean);
         if (input) input.value = "";
       }
 
-      // --- Add yours ⇄ Submit button logic ---
-      if (addBtn && input) {
-        function setBtnLabel() { addBtn.textContent = input.value.trim() ? 'Submit' : 'Add yours'; }
+      if (addBtn) {
         addBtn.addEventListener('click', () => {
-          const val = input.value.trim();
-          const hidden = input.classList.contains('hidden') || getComputedStyle(input).display === 'none';
-          if (val) { queueUserPhrase(val); input.value=''; setBtnLabel(); input.classList.add('hidden'); }
-          else { if (hidden) input.classList.remove('hidden'); input.focus(); setBtnLabel(); }
+          if (input && getComputedStyle(input).display !== 'none') {
+            input.classList.remove('hidden');
+            input.focus();
+          } else {
+            const v = prompt('Say no 2 …');
+            if (v !== null) queueUserPhrase(v);
+          }
         });
-        input.addEventListener('input', setBtnLabel);
-        input.addEventListener('keydown', (e) => { if (e.key==='Enter'&&input.value.trim()){ queueUserPhrase(input.value); input.value=''; setBtnLabel(); input.classList.add('hidden'); }});
-        input.addEventListener('blur', () => { if (!input.value.trim()){ input.classList.add('hidden'); setBtnLabel(); } });
-        setBtnLabel();
-      } else if (addBtn) {
-        addBtn.addEventListener('click', () => { const v=prompt('Say no 2 …'); if(v!==null) queueUserPhrase(v); });
       }
-      // --- end ---
 
-      set("placeholder");
+      if (input) {
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') queueUserPhrase(input.value); });
+        input.addEventListener('blur', () => { if (input.value.trim() === "") input.classList.add('hidden'); });
+      }
+
+      set("placeholder"); // per request: default shows “placeholder”
       start();
     })();
   </script>
 
-  <!-- Poll logic (unchanged) -->
+  <!-- Poll logic -->
   <script>
     (function () {
       const listEl = document.getElementById('poll-list');
       const statsEl = document.getElementById('poll-stats');
+
       const addMobileBtn = document.getElementById('n2-add-mobile');
       const inputMobile  = document.getElementById('n2-input-mobile');
-      // ... rest of your poll script unchanged ...
+
+      // tiny confetti for delight (no deps)
+      function confettiBurst(x = window.innerWidth/2, y = window.innerHeight/4) {
+        const n = 24, dur = 900;
+        for (let i=0;i<n;i++){
+          const p = document.createElement('div');
+          p.style.position='fixed';
+          p.style.left = x + 'px';
+          p.style.top  = y + 'px';
+          p.style.width = p.style.height = '6px';
+          p.style.borderRadius = '2px';
+          p.style.background = `hsl(${Math.random()*360},90%,60%)`;
+          p.style.pointerEvents = 'none';
+          p.style.zIndex = 50;
+          document.body.appendChild(p);
+          const ang = (Math.PI*2)*(i/n) + Math.random()*0.6;
+          const v = 6 + Math.random()*6;
+          const dx = Math.cos(ang)*v*16;
+          const dy = Math.sin(ang)*v*16 - 30;
+          p.animate([
+            { transform: 'translate(0,0)', opacity: 1 },
+            { transform: `translate(${dx}px,${dy}px) rotate(${Math.random()*360}deg)`, opacity: 0 }
+          ], { duration: dur + Math.random()*400, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' })
+          .addEventListener('finish', ()=> p.remove());
+        }
+      }
+      window.__n2Confetti = () => confettiBurst();
+
+      function load() {
+        try { return JSON.parse(localStorage.getItem('n2-poll') || '[]'); }
+        catch { return []; }
+      }
+      function save(items) {
+        localStorage.setItem('n2-poll', JSON.stringify(items));
+      }
+
+      // seed once if empty
+      const SEED = [
+        "forms","friction","waiting on hold","endless sign-up hoops","CAPTCHAs","‘we’ll get back to you’","meeting overload","spammy popups","busywork"
+      ];
+      let items = load();
+      if (items.length === 0) {
+        items = SEED.map((label, idx) => ({ id: crypto.randomUUID(), label, votes: Math.max(0, (SEED.length-idx-1)) }));
+        save(items);
+      }
+
+      // track user's own votes to allow toggle (per item)
+      function loadMyVotes() {
+        try { return JSON.parse(localStorage.getItem('n2-myVotes') || '[]'); }
+        catch { return []; }
+      }
+      function saveMyVotes(ids) {
+        localStorage.setItem('n2-myVotes', JSON.stringify(ids));
+      }
+
+      function totals() {
+        const totalVotes = items.reduce((s, it) => s + Math.max(0, it.votes|0), 0);
+        return { totalVotes, count: items.length };
+      }
+
+      function render() {
+        const myVotes = new Set(loadMyVotes());
+        const { totalVotes } = totals();
+
+        // sort by votes desc then label
+        const sorted = [...items].sort((a,b)=> (b.votes|0)-(a.votes|0) || a.label.localeCompare(b.label));
+
+        listEl.innerHTML = '';
+        for (const it of sorted) {
+          const pct = totalVotes ? Math.round((Math.max(0,it.votes|0) / totalVotes) * 100) : 0;
+          const voted = myVotes.has(it.id);
+
+          const row = document.createElement('div');
+          row.className = "group relative overflow-hidden rounded-2xl border border-zinc-800/60 bg-zinc-900/40 p-4 hover:border-fuchsia-600/40 transition";
+
+          row.innerHTML = `
+            <div class="flex items-center justify-between gap-3">
+              <button data-id="${it.id}" class="vote-btn inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm
+                ${voted ? 'bg-gradient-to-r from-fuchsia-500/90 to-indigo-500/90 text-white' : 'bg-zinc-800/60 text-zinc-200'}
+                hover:scale-[1.02] active:scale-[.98] transition">
+                <span>${voted ? '✅' : '➕'}</span>
+                <span>say no 2 “${it.label.replace(/"/g,'&quot;')}”</span>
+              </button>
+              <div class="text-sm text-zinc-300 tabular-nums"><span class="font-semibold">${it.votes|0}</span> votes</div>
+            </div>
+            <div class="mt-3 h-2 w-full rounded-full bg-zinc-800/70">
+              <div class="h-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500" style="width:${pct}%;"></div>
+            </div>
+            <div class="mt-2 text-xs text-zinc-400">${pct}% of votes</div>
+          `;
+          listEl.appendChild(row);
+        }
+
+        statsEl.textContent = `${items.length} options • ${totalVotes} total votes`;
+      }
+
+      function upsert(label, delta=0) {
+        label = label.trim().replace(/^say\s*no\s*2\s*/i, "").slice(0, 50);
+        if (!label) return null;
+        const found = items.find(i => i.label.toLowerCase() === label.toLowerCase());
+        if (found) {
+          found.votes = Math.max(0, (found.votes|0) + (delta|0));
+          save(items); render();
+          return found;
+        } else {
+          const obj = { id: crypto.randomUUID(), label, votes: Math.max(0, delta|0) };
+          items.push(obj);
+          save(items); render();
+          return obj;
+        }
+      }
+
+      // expose for rotator script to piggy-back
+      window.__n2UpsertPollItem = function(label, delta){ return upsert(label, delta||0); };
+
+      // voting (toggle)
+      listEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('.vote-btn');
+        if (!btn) return;
+        const id = btn.getAttribute('data-id');
+        const my = new Set(loadMyVotes());
+        const idx = items.findIndex(i => i.id === id);
+        if (idx === -1) return;
+
+        if (my.has(id)) {
+          items[idx].votes = Math.max(0, (items[idx].votes|0) - 1);
+          my.delete(id);
+        } else {
+          items[idx].votes = (items[idx].votes|0) + 1;
+          my.add(id);
+          confettiBurst(e.clientX, e.clientY);
+          // also nudge the rotator for fun
+          window.__n2AddToRotator && window.__n2AddToRotator(items[idx].label);
+        }
+
+        save(items); saveMyVotes([...my]); render();
+      });
+
+      // mobile add
+      function addFromMobile() {
+        const v = (inputMobile.value || "").trim();
+        if (!v) return;
+        const obj = upsert(v, 1);
+        if (obj) {
+          const mine = new Set(loadMyVotes()); mine.add(obj.id); saveMyVotes([...mine]);
+          render();
+          window.__n2AddToRotator && window.__n2AddToRotator(obj.label);
+          confettiBurst();
+        }
+        inputMobile.value = "";
+      }
+      if (addMobileBtn) addMobileBtn.addEventListener('click', addFromMobile);
+      if (inputMobile) inputMobile.addEventListener('keydown', (e)=>{ if (e.key==='Enter') addFromMobile(); });
+
+      // initial paint
+      render();
     })();
   </script>
 
+  <!-- your chat widget -->
   <script src="/chat-widget.js" defer></script>
 </body>
 </html>
