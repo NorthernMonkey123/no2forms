@@ -25,8 +25,9 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           // You can change "from" later to hello@no2forms.com after domain setup
-          from: "no2forms <notifications@onresend.com>",
+          from: "no2forms <onboarding@resend.dev>", 
           to: [process.env.BOOKINGS_TO_EMAIL],
+          reply_to: process.env.BOOKINGS_TO_EMAIL,  
           subject: "New no2forms booking",
           text: lines.join("\n"),
         }),
