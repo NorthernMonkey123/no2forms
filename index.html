@@ -19,24 +19,54 @@
     html, body { height: 100%; }
     body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
     .grain { background-image: radial-gradient(rgba(255,255,255,.6), rgba(255,255,255,0)); background-size: 1200px 1200px; background-position: 50% 0; }
+
+    /* playful bits */
+    @keyframes shimmer {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 200% 50%; }
+    }
+    .shimmer {
+      background-size: 200% 200%;
+      animation: shimmer 6s linear infinite;
+    }
+    @keyframes wobble {
+      0%,100%{ transform: rotate(0deg) translateY(0) }
+      50%{ transform: rotate(-1deg) translateY(-2px) }
+    }
+    .wobble:hover { animation: wobble .6s ease-in-out; }
+    @keyframes floaty {
+      0% { transform: translateY(0px) }
+      50% { transform: translateY(-10px) }
+      100% { transform: translateY(0px) }
+    }
+    .floaty { animation: floaty 5s ease-in-out infinite; }
   </style>
 </head>
 <body class="min-h-full bg-zinc-950 text-zinc-100">
   <!-- Background glow -->
   <div class="pointer-events-none fixed inset-0 overflow-hidden">
-    <div class="grain absolute -top-40 left-1/2 h-[60rem] w-[60rem] -translate-x-1/2 rounded-full bg-fuchsia-500/20 blur-3xl"></div>
-    <div class="grain absolute -top-20 right-1/3 h-[40rem] w-[40rem] rounded-full bg-indigo-500/20 blur-3xl"></div>
+    <div class="grain absolute -top-40 left-1/2 h-[60rem] w-[60rem] -translate-x-1/2 rounded-full bg-fuchsia-500/25 blur-3xl"></div>
+    <div class="grain absolute -top-20 right-1/3 h-[40rem] w-[40rem] rounded-full bg-indigo-500/25 blur-3xl"></div>
+  </div>
+
+  <!-- playful stickers -->
+  <div aria-hidden="true" class="pointer-events-none fixed inset-0 z-0">
+    <div class="absolute left-[6%] top-[18%] text-4xl opacity-60 floaty">✨</div>
+    <div class="absolute right-[10%] top-[12%] text-3xl opacity-60 floaty" style="animation-delay:.7s">🎈</div>
+    <div class="absolute left-[12%] bottom-[12%] text-4xl opacity-60 floaty" style="animation-delay:1.1s">🌀</div>
+    <div class="absolute right-[14%] bottom-[10%] text-4xl opacity-60 floaty" style="animation-delay:1.6s">💥</div>
   </div>
 
   <header class="relative z-10">
     <div class="mx-auto max-w-7xl px-6 py-6 flex items-center justify-between">
-      <a href="#" class="flex items-center gap-3">
+      <a href="#" class="flex items-center gap-3 wobble">
         <div class="h-9 w-9 rounded-2xl bg-gradient-to-br from-fuchsia-500 to-indigo-500 shadow-lg"></div>
         <span class="text-lg font-semibold tracking-tight">no2forms</span>
       </a>
       <nav class="hidden md:flex items-center gap-6 text-sm text-zinc-300">
         <a class="hover:text-white transition" href="#problem">Why</a>
         <a class="hover:text-white transition" href="#how">How it works</a>
+        <a class="hover:text-white transition" href="#poll">Poll</a>
         <a class="hover:text-white transition" href="#cta">Waitlist</a>
       </nav>
     </div>
@@ -47,7 +77,11 @@
     <section class="px-6">
       <div class="mx-auto max-w-5xl pt-24 pb-16 text-center">
         <h1 class="text-4xl sm:text-6xl font-extrabold leading-tight tracking-tight">
-          Say no 2 <span id="n2-rotator" class="bg-clip-text text-transparent bg-gradient-to-r from-fuchsia-400 to-indigo-400">forms</span>
+          Say no 2
+          <span id="n2-rotator"
+            class="bg-clip-text text-transparent bg-gradient-to-r from-fuchsia-400 via-rose-300 to-indigo-400 shimmer">
+            placeholder
+          </span>
         </h1>
         <p class="mt-6 text-lg sm:text-xl text-zinc-300 max-w-3xl mx-auto">
           Capture intent and start conversations instantly. no2forms turns clicks into qualified intros — without the clunky form fields.
@@ -57,7 +91,7 @@
         <div class="mt-5 flex items-center justify-center gap-2">
           <input id="n2-input" type="text" inputmode="text"
                  placeholder="Add your own…"
-                 class="hidden sm:block w-64 rounded-xl bg-zinc-900/50 border border-zinc-800/60 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-600/40" />
+                 class="hidden sm:block w-72 rounded-xl bg-zinc-900/50 border border-zinc-800/60 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-600/40" />
           <button id="n2-add"
                   class="inline-flex items-center rounded-2xl border border-zinc-700/70 px-3 py-2 text-sm text-zinc-200 hover:border-zinc-500 hover:bg-zinc-900/40 transition">
             Add yours
@@ -112,7 +146,7 @@
 
     <!-- How it works -->
     <section id="how" class="px-6">
-      <div class="mx-auto max-w-5xl pb-24">
+      <div class="mx-auto max-w-5xl pb-10">
         <h2 class="text-2xl sm:text-3xl font-bold text-center">How it works</h2>
         <div class="mt-10 grid md:grid-cols-3 gap-6">
           <div class="rounded-2xl border border-zinc-800/60 p-6 bg-zinc-900/40">
@@ -129,6 +163,37 @@
             <div class="text-sm uppercase tracking-wide text-zinc-400">Step 3</div>
             <h3 class="mt-2 font-semibold">Instant intro</h3>
             <p class="mt-2 text-zinc-300">We route the conversation to Slack, email, or your CRM in seconds.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Poll -->
+    <section id="poll" class="px-6">
+      <div class="mx-auto max-w-5xl pb-24">
+        <div class="rounded-3xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900/60 to-zinc-900/20 p-6 sm:p-8">
+          <div class="flex items-center justify-between gap-4">
+            <h2 class="text-2xl sm:text-3xl font-bold">
+              The no2forms poll — what should we all say no 2?
+            </h2>
+            <span class="hidden sm:inline text-xs text-zinc-400">Votes saved on your device</span>
+          </div>
+
+          <!-- add inline on mobile -->
+          <div class="mt-5 flex sm:hidden items-center gap-2">
+            <input id="n2-input-mobile" type="text" inputmode="text"
+                   placeholder="Add your own…"
+                   class="flex-1 rounded-xl bg-zinc-900/50 border border-zinc-800/60 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-600/40" />
+            <button id="n2-add-mobile"
+                    class="rounded-2xl border border-zinc-700/70 px-3 py-2 text-sm text-zinc-200 hover:border-zinc-500 hover:bg-zinc-900/40 transition">
+              Add
+            </button>
+          </div>
+
+          <div id="poll-list" class="mt-6 grid sm:grid-cols-2 gap-3"></div>
+
+          <div class="mt-6">
+            <div class="text-xs text-zinc-400" id="poll-stats"></div>
           </div>
         </div>
       </div>
@@ -150,14 +215,14 @@
     document.getElementById('y').textContent = new Date().getFullYear();
   </script>
 
-  <!-- Say no 2 rotator -->
+  <!-- Say no 2 rotator (dynamic heading) -->
   <script>
     (function () {
       const rotator = document.getElementById('n2-rotator');
       const addBtn  = document.getElementById('n2-add');
       const input   = document.getElementById('n2-input');
 
-      const phrases = [
+      const basePhrases = [
         "forms",
         "friction",
         "waiting on hold",
@@ -169,35 +234,58 @@
         "busywork"
       ];
 
+      // poll store will feed back here
+      function getPollItems() {
+        try { return JSON.parse(localStorage.getItem('n2-poll') || '[]'); }
+        catch { return []; }
+      }
+
+      function getPhraseSet() {
+        const extras = getPollItems().map(p => p.label);
+        // unique list with base first
+        const set = [...basePhrases];
+        for (const e of extras) if (!set.includes(e)) set.push(e);
+        return set;
+      }
+
+      let phrases = getPhraseSet();
       let i = 0, timer = null;
 
       function set(text) {
         rotator.style.opacity = 0;
         setTimeout(() => {
-          rotator.textContent = text;
+          rotator.textContent = text || "placeholder";
           rotator.style.opacity = 1;
-        }, 140);
+        }, 120);
       }
 
       function next() {
+        phrases = getPhraseSet();
         i = (i + 1) % phrases.length;
         set(phrases[i]);
       }
 
       function start() {
         if (timer) clearInterval(timer);
-        timer = setInterval(next, 2400);
+        timer = setInterval(next, 2000);
       }
 
+      // exposed so poll can push new entries into the cycle
+      window.__n2AddToRotator = function(label) {
+        phrases = getPhraseSet();
+        set(label);
+        start();
+      };
+
+      // input UX
       function queueUserPhrase(raw) {
         const t = (raw || "").trim();
         if (!t) return;
         const clean = t.replace(/^say\s*no\s*2\s*/i, "").slice(0, 50);
-        if (!phrases.includes(clean)) {
-          phrases.splice(i + 1, 0, clean);
-        }
-        set(clean);
-        start();
+        if (!clean) return;
+        window.__n2UpsertPollItem(clean, +1); // create with +1 vote
+        window.__n2Confetti && window.__n2Confetti();
+        window.__n2AddToRotator(clean);
         if (input) input.value = "";
       }
 
@@ -214,16 +302,179 @@
       }
 
       if (input) {
-        input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') queueUserPhrase(input.value);
-        });
-        input.addEventListener('blur', () => {
-          if (input.value.trim() === "") input.classList.add('hidden');
-        });
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') queueUserPhrase(input.value); });
+        input.addEventListener('blur', () => { if (input.value.trim() === "") input.classList.add('hidden'); });
       }
 
-      set(phrases[0]);
+      set("placeholder"); // per request: default shows “placeholder”
       start();
+    })();
+  </script>
+
+  <!-- Poll logic -->
+  <script>
+    (function () {
+      const listEl = document.getElementById('poll-list');
+      const statsEl = document.getElementById('poll-stats');
+
+      const addMobileBtn = document.getElementById('n2-add-mobile');
+      const inputMobile  = document.getElementById('n2-input-mobile');
+
+      // tiny confetti for delight (no deps)
+      function confettiBurst(x = window.innerWidth/2, y = window.innerHeight/4) {
+        const n = 24, dur = 900;
+        for (let i=0;i<n;i++){
+          const p = document.createElement('div');
+          p.style.position='fixed';
+          p.style.left = x + 'px';
+          p.style.top  = y + 'px';
+          p.style.width = p.style.height = '6px';
+          p.style.borderRadius = '2px';
+          p.style.background = `hsl(${Math.random()*360},90%,60%)`;
+          p.style.pointerEvents = 'none';
+          p.style.zIndex = 50;
+          document.body.appendChild(p);
+          const ang = (Math.PI*2)*(i/n) + Math.random()*0.6;
+          const v = 6 + Math.random()*6;
+          const dx = Math.cos(ang)*v*16;
+          const dy = Math.sin(ang)*v*16 - 30;
+          p.animate([
+            { transform: 'translate(0,0)', opacity: 1 },
+            { transform: `translate(${dx}px,${dy}px) rotate(${Math.random()*360}deg)`, opacity: 0 }
+          ], { duration: dur + Math.random()*400, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' })
+          .addEventListener('finish', ()=> p.remove());
+        }
+      }
+      window.__n2Confetti = () => confettiBurst();
+
+      function load() {
+        try { return JSON.parse(localStorage.getItem('n2-poll') || '[]'); }
+        catch { return []; }
+      }
+      function save(items) {
+        localStorage.setItem('n2-poll', JSON.stringify(items));
+      }
+
+      // seed once if empty
+      const SEED = [
+        "forms","friction","waiting on hold","endless sign-up hoops","CAPTCHAs","‘we’ll get back to you’","meeting overload","spammy popups","busywork"
+      ];
+      let items = load();
+      if (items.length === 0) {
+        items = SEED.map((label, idx) => ({ id: crypto.randomUUID(), label, votes: Math.max(0, (SEED.length-idx-1)) }));
+        save(items);
+      }
+
+      // track user's own votes to allow toggle (per item)
+      function loadMyVotes() {
+        try { return JSON.parse(localStorage.getItem('n2-myVotes') || '[]'); }
+        catch { return []; }
+      }
+      function saveMyVotes(ids) {
+        localStorage.setItem('n2-myVotes', JSON.stringify(ids));
+      }
+
+      function totals() {
+        const totalVotes = items.reduce((s, it) => s + Math.max(0, it.votes|0), 0);
+        return { totalVotes, count: items.length };
+      }
+
+      function render() {
+        const myVotes = new Set(loadMyVotes());
+        const { totalVotes } = totals();
+
+        // sort by votes desc then label
+        const sorted = [...items].sort((a,b)=> (b.votes|0)-(a.votes|0) || a.label.localeCompare(b.label));
+
+        listEl.innerHTML = '';
+        for (const it of sorted) {
+          const pct = totalVotes ? Math.round((Math.max(0,it.votes|0) / totalVotes) * 100) : 0;
+          const voted = myVotes.has(it.id);
+
+          const row = document.createElement('div');
+          row.className = "group relative overflow-hidden rounded-2xl border border-zinc-800/60 bg-zinc-900/40 p-4 hover:border-fuchsia-600/40 transition";
+
+          row.innerHTML = `
+            <div class="flex items-center justify-between gap-3">
+              <button data-id="${it.id}" class="vote-btn inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm
+                ${voted ? 'bg-gradient-to-r from-fuchsia-500/90 to-indigo-500/90 text-white' : 'bg-zinc-800/60 text-zinc-200'}
+                hover:scale-[1.02] active:scale-[.98] transition">
+                <span>${voted ? '✅' : '➕'}</span>
+                <span>say no 2 “${it.label.replace(/"/g,'&quot;')}”</span>
+              </button>
+              <div class="text-sm text-zinc-300 tabular-nums"><span class="font-semibold">${it.votes|0}</span> votes</div>
+            </div>
+            <div class="mt-3 h-2 w-full rounded-full bg-zinc-800/70">
+              <div class="h-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500" style="width:${pct}%;"></div>
+            </div>
+            <div class="mt-2 text-xs text-zinc-400">${pct}% of votes</div>
+          `;
+          listEl.appendChild(row);
+        }
+
+        statsEl.textContent = `${items.length} options • ${totalVotes} total votes`;
+      }
+
+      function upsert(label, delta=0) {
+        label = label.trim().replace(/^say\s*no\s*2\s*/i, "").slice(0, 50);
+        if (!label) return null;
+        const found = items.find(i => i.label.toLowerCase() === label.toLowerCase());
+        if (found) {
+          found.votes = Math.max(0, (found.votes|0) + (delta|0));
+          save(items); render();
+          return found;
+        } else {
+          const obj = { id: crypto.randomUUID(), label, votes: Math.max(0, delta|0) };
+          items.push(obj);
+          save(items); render();
+          return obj;
+        }
+      }
+
+      // expose for rotator script to piggy-back
+      window.__n2UpsertPollItem = function(label, delta){ return upsert(label, delta||0); };
+
+      // voting (toggle)
+      listEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('.vote-btn');
+        if (!btn) return;
+        const id = btn.getAttribute('data-id');
+        const my = new Set(loadMyVotes());
+        const idx = items.findIndex(i => i.id === id);
+        if (idx === -1) return;
+
+        if (my.has(id)) {
+          items[idx].votes = Math.max(0, (items[idx].votes|0) - 1);
+          my.delete(id);
+        } else {
+          items[idx].votes = (items[idx].votes|0) + 1;
+          my.add(id);
+          confettiBurst(e.clientX, e.clientY);
+          // also nudge the rotator for fun
+          window.__n2AddToRotator && window.__n2AddToRotator(items[idx].label);
+        }
+
+        save(items); saveMyVotes([...my]); render();
+      });
+
+      // mobile add
+      function addFromMobile() {
+        const v = (inputMobile.value || "").trim();
+        if (!v) return;
+        const obj = upsert(v, 1);
+        if (obj) {
+          const mine = new Set(loadMyVotes()); mine.add(obj.id); saveMyVotes([...mine]);
+          render();
+          window.__n2AddToRotator && window.__n2AddToRotator(obj.label);
+          confettiBurst();
+        }
+        inputMobile.value = "";
+      }
+      if (addMobileBtn) addMobileBtn.addEventListener('click', addFromMobile);
+      if (inputMobile) inputMobile.addEventListener('keydown', (e)=>{ if (e.key==='Enter') addFromMobile(); });
+
+      // initial paint
+      render();
     })();
   </script>
 
