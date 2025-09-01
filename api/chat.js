@@ -1,26 +1,43 @@
 // File: api/chat.js
-export const config = { runtime: "edge" }; // Fast, global
-
-export default async function handler(req) {
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Use POST" }), {
-      status: 405,
-      headers: { "content-type": "application/json" },
-    });
-  }
+export default async function handler(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "Use POST" });
 
   try {
-    const body = await req.json();
-    const userMessage = (body && body.message) || "";
+    const { messages } = req.body || {};
+    const history = Array.isArray(messages) ? messages : [];
 
-    if (!userMessage) {
-      return new Response(JSON.stringify({ error: "Missing message" }), {
-        status: 400,
-        headers: { "content-type": "application/json" },
-      });
-    }
+    const system = `
+You are the no2forms website assistant.
+Decide if the user's message is general chat or a booking request.
+Keep replies short, friendly, and on-brand.
 
-    // Call OpenAI (server-side: your key stays secret)
+Return ONLY a single JSON object with this exact shape:
+{
+  "mode": "chat" | "booking",
+  "reply": "assistant message shown to the user",
+  "missing": null | "email" | "time" | "name",
+  "slots": { "email": string, "time": string, "name": string }
+}
+
+Rules:
+- If user expresses intent to book/schedule, set "mode":"booking".
+- Track info already provided across the conversation (email/time/name).
+- "missing" is the NEXT piece you still need for booking, or null if you have all.
+- Time can be natural language ("Thu 3–4pm UK"). If only a single time is given (e.g., "3pm"), assume a 1-hour window.
+- Default timezone: Europe/London unless user specifies otherwise.
+- When email + time are present ("missing": null), the "reply" should confirm details.
+- Otherwise (no booking intent), use "mode":"chat" and a concise helpful "reply".
+
+Return JSON only. No markdown, no code fences.
+    `.trim();
+
+    const examples = [
+      { role: "user", content: "hi" },
+      { role: "assistant", content: JSON.stringify({mode:"chat", reply:"Hi! I can explain how no2forms replaces forms with chat, or book a quick call if you’d like.", missing:null, slots:{email:"",time:"",name:""}}) },
+      { role: "user", content: "book a demo" },
+      { role: "assistant", content: JSON.stringify({mode:"booking", reply:"Great — what’s your email address?", missing:"email", slots:{email:"",time:"",name:""}}) }
+    ];
+
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -28,50 +45,44 @@ export default async function handler(req) {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini", // cost-effective, responsive
+        model: "gpt-4o-mini",
+        temperature: 0.3,
         messages: [
-         // inside messages: [ { role: "system", content: ... }, ... ]
-{
-  role: "system",
-  content: `
-You are the no2forms assistant. Be concise, friendly, and helpful.
-Goals:
-1) Explain how no2forms replaces forms with conversational flows.
-2) If the user wants a demo or to "book", guide them to provide an email and a preferred time window (e.g., Thu 3–5pm UK).
-3) WHEN you have both an email and a time window, output ONE single line in this exact format (no extra words):
-BOOKING|email@example.com|Thu 15:00–16:00 UK|Name (if provided)|Notes (optional)
-Otherwise, continue the conversation normally. Do not output BOOKING until you have both email and a time.
-If asked about pricing/onboarding: say it's early access; we’ll tailor a plan and can book a quick call.
-`.trim()
-},
-
-          { role: "user", content: userMessage },
+          { role: "system", content: system },
+          ...examples,
+          ...history
         ],
-        temperature: 0.6,
       }),
     });
 
+    const data = await openaiRes.json();
     if (!openaiRes.ok) {
-      const errText = await openaiRes.text();
-      return new Response(JSON.stringify({ error: errText }), {
-        status: 500,
-        headers: { "content-type": "application/json" },
-      });
+      console.error("OpenAI API error:", data);
+      return res.status(500).json({ error: data.error || data });
     }
 
-    const data = await openaiRes.json();
-    const reply =
-      data?.choices?.[0]?.message?.content?.trim() ||
-      "Sorry — I couldn't generate a response.";
+    const raw = data?.choices?.[0]?.message?.content || "";
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      // Fallback for safety
+      parsed = {
+        mode: "chat",
+        reply: raw || "Happy to help! Ask me anything — or say “book a demo”.",
+        missing: null,
+        slots: { email:"", time:"", name:"" }
+      };
+    }
 
-    return new Response(JSON.stringify({ reply }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
+    // Minimal schema guard
+    if (!parsed || typeof parsed !== "object" || !("mode" in parsed) || !("reply" in parsed)) {
+      parsed = { mode: "chat", reply: "Happy to help! Ask me anything — or say “book a demo”.", missing: null, slots: { email:"", time:"", name:"" } };
+    }
+
+    res.status(200).json(parsed);
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message || "Server error" }), {
-      status: 500,
-      headers: { "content-type": "application/json" },
-    });
+    console.error("Server error:", e);
+    res.status(500).json({ error: e.message || "Server error" });
   }
 }
