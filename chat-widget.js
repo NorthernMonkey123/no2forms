@@ -62,6 +62,42 @@
     messages.scrollTop = messages.scrollHeight;
   };
 
+  // Detect "BOOKING|email|time|name|notes" line
+  const maybeNotifyBooking = async (reply) => {
+    if (!reply || !reply.startsWith("BOOKING|")) return;
+
+    const parts = reply.split("|");
+    const email = (parts[1] || "").trim();
+    const time = (parts[2] || "").trim();
+    const name = (parts[3] || "").trim();
+    const notes = (parts[4] || "").trim();
+
+    try {
+      const nres = await fetch("/api/notify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, time, name, notes }),
+      });
+      if (nres.ok) {
+        appendMsg(
+          "✅ All set — I’ve passed your details to the team. You’ll get a confirmation shortly (no forms needed).",
+          "bot"
+        );
+      } else {
+        appendMsg(
+          "I tried to log your booking but hit a snag. I’ve still captured your details — we’ll follow up.",
+          "bot"
+        );
+      }
+    } catch (e) {
+      console.error("notify error", e);
+      appendMsg(
+        "I couldn’t reach our booking service just now, but I’ve kept your details. We’ll confirm by email.",
+        "bot"
+      );
+    }
+  };
+
   const ask = async (text) => {
     sendBtn.disabled = true;
     appendMsg(text, "user");
@@ -75,10 +111,15 @@
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Request failed");
-      appendMsg(data.reply, "bot");
+
+      const reply = data.reply || "";
+      appendMsg(reply, "bot");
+
+      // Booking detection + notify
+      await maybeNotifyBooking(reply);
     } catch (e) {
-      appendMsg("Sorry — something went wrong. Please try again.", "bot");
       console.error(e);
+      appendMsg("Sorry — something went wrong. Please try again.", "bot");
     } finally {
       sendBtn.disabled = false;
       input.focus();
@@ -89,7 +130,10 @@
     panel.style.display = panel.style.display === "flex" ? "none" : "flex";
     panel.style.flexDirection = "column";
     if (panel.style.display === "flex" && messages.childElementCount === 0) {
-      appendMsg("Hi! I’m the no2forms assistant. Ask me anything about replacing forms with AI.", "bot");
+      appendMsg(
+        "Hi! I’m the no2forms assistant. Ask me anything — and if you want a demo, just say when works and your email, I’ll handle the rest.",
+        "bot"
+      );
     }
   });
   closeBtn.addEventListener("click", () => (panel.style.display = "none"));
