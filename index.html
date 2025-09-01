@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>no2forms — Stop making people fill out forms</title>
-  <meta name="description" content="no2forms helps you capture intent and start conversations without clunky forms. Coming soon." />
+  <title>no2forms — Say no 2 forms (and other nonsense)</title>
+  <meta name="description" content="no2forms helps you capture intent and start conversations without clunky forms. Say no 2 friction, waiting on hold, and busywork." />
   <meta property="og:title" content="no2forms" />
   <meta property="og:description" content="Capture intent. Start conversations. No forms." />
   <meta property="og:type" content="website" />
@@ -47,11 +47,24 @@
     <section class="px-6">
       <div class="mx-auto max-w-5xl pt-24 pb-16 text-center">
         <h1 class="text-4xl sm:text-6xl font-extrabold leading-tight tracking-tight">
-          Stop making people fill out <span class="bg-clip-text text-transparent bg-gradient-to-r from-fuchsia-400 to-indigo-400">forms</span>
+          Say no 2 <span id="n2-rotator" class="bg-clip-text text-transparent bg-gradient-to-r from-fuchsia-400 to-indigo-400">forms</span>
         </h1>
         <p class="mt-6 text-lg sm:text-xl text-zinc-300 max-w-3xl mx-auto">
           Capture intent and start conversations instantly. no2forms turns clicks into qualified intros — without the clunky form fields.
         </p>
+
+        <!-- Add-your-own -->
+        <div class="mt-5 flex items-center justify-center gap-2">
+          <input id="n2-input" type="text" inputmode="text"
+                 placeholder="Add your own…"
+                 class="hidden sm:block w-64 rounded-xl bg-zinc-900/50 border border-zinc-800/60 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-600/40" />
+          <button id="n2-add"
+                  class="inline-flex items-center rounded-2xl border border-zinc-700/70 px-3 py-2 text-sm text-zinc-200 hover:border-zinc-500 hover:bg-zinc-900/40 transition">
+            Add yours
+          </button>
+        </div>
+        <p class="mt-2 text-xs text-zinc-500">Try it: “paperwork”, “CAPTCHAs”, “waiting on hold”, “meeting overload”…</p>
+
         <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4" id="cta">
           <a href="mailto:hello@no2forms.com?subject=Waitlist&body=Hi%20—%20please%20add%20me%20to%20the%20no2forms%20waitlist." class="inline-flex items-center justify-center rounded-2xl px-6 py-3 text-base font-medium bg-white text-zinc-900 shadow hover:shadow-lg hover:scale-[1.01] active:scale-[.99] transition">
             Join the waitlist
@@ -126,7 +139,6 @@
     <div class="mx-auto max-w-7xl px-6 py-12 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-400">
       <div>© <span id="y"></span> no2forms</div>
       <div class="flex items-center gap-4">
-        
         <a class="hover:text-white" href="mailto:hello@no2forms.com">Contact</a>
         <a class="hover:text-white" href="#">Twitter</a>
         <a class="hover:text-white" href="#">Privacy</a>
@@ -137,8 +149,85 @@
   <script>
     document.getElementById('y').textContent = new Date().getFullYear();
   </script>
-  <script src="/chat-widget.js" defer></script>
-  
 
+  <!-- Say no 2 rotator -->
+  <script>
+    (function () {
+      const rotator = document.getElementById('n2-rotator');
+      const addBtn  = document.getElementById('n2-add');
+      const input   = document.getElementById('n2-input');
+
+      const phrases = [
+        "forms",
+        "friction",
+        "waiting on hold",
+        "endless sign-up hoops",
+        "CAPTCHAs",
+        "‘we’ll get back to you’",
+        "meeting overload",
+        "spammy popups",
+        "busywork"
+      ];
+
+      let i = 0, timer = null;
+
+      function set(text) {
+        rotator.style.opacity = 0;
+        setTimeout(() => {
+          rotator.textContent = text;
+          rotator.style.opacity = 1;
+        }, 140);
+      }
+
+      function next() {
+        i = (i + 1) % phrases.length;
+        set(phrases[i]);
+      }
+
+      function start() {
+        if (timer) clearInterval(timer);
+        timer = setInterval(next, 2400);
+      }
+
+      function queueUserPhrase(raw) {
+        const t = (raw || "").trim();
+        if (!t) return;
+        const clean = t.replace(/^say\s*no\s*2\s*/i, "").slice(0, 50);
+        if (!phrases.includes(clean)) {
+          phrases.splice(i + 1, 0, clean);
+        }
+        set(clean);
+        start();
+        if (input) input.value = "";
+      }
+
+      if (addBtn) {
+        addBtn.addEventListener('click', () => {
+          if (input && getComputedStyle(input).display !== 'none') {
+            input.classList.remove('hidden');
+            input.focus();
+          } else {
+            const v = prompt('Say no 2 …');
+            if (v !== null) queueUserPhrase(v);
+          }
+        });
+      }
+
+      if (input) {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') queueUserPhrase(input.value);
+        });
+        input.addEventListener('blur', () => {
+          if (input.value.trim() === "") input.classList.add('hidden');
+        });
+      }
+
+      set(phrases[0]);
+      start();
+    })();
+  </script>
+
+  <!-- your chat widget -->
+  <script src="/chat-widget.js" defer></script>
 </body>
 </html>
