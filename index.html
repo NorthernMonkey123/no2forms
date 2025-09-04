@@ -72,7 +72,7 @@
           <li class="rounded-xl border border-zinc-800/60 bg-zinc-900/40 p-4">• Works with your tools (email, Slack, CRM)</li>
         </ul>
         <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4" id="cta">
-          <button id="start-trial-chat" class="inline-flex items-center justify-center rounded-2xl px-6 py-3 text-base font-medium bg-white text-zinc-900 shadow hover:shadow-lg hover:scale-[1.01] active:scale-[.99] transition focus-ring">
+          <button id="start-trial-chat" type="button" class="inline-flex items-center justify-center rounded-2xl px-6 py-3 text-base font-medium bg-white text-zinc-900 shadow hover:shadow-lg hover:scale-[1.01] active:scale-[.99] transition focus-ring" aria-controls="no2-chat-widget" aria-expanded="false">
             Start 14-day trial in chat
           </button>
           <a href="#how" class="inline-flex items-center justify-center rounded-2xl px-6 py-3 text-base font-medium border border-zinc-700/70 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-900/40 transition focus-ring">See how it works</a>
@@ -203,33 +203,26 @@
   </footer>
 
   <script>
-    // Open chat on CTA; fall back to email if widget isn't available
+    // Wire CTA to open the chat widget (no email fallback)
     (function(){
       const btn = document.getElementById('start-trial-chat');
-      const MAILTO = 'mailto:hello@no2forms.com?subject=Start%2014-day%20trial&body=Hi%2C%20I%E2%80%99d%20like%20to%20try%20no2forms.';
-      let ack = false;
-      if (btn) {
-        window.addEventListener('no2chat:ack', () => { ack = true; });
-        btn.addEventListener('click', function(e){
-          e.preventDefault();
-          ack = false;
-          try {
-            // Try common widget globals
-            if (window.no2chat && typeof window.no2chat.open === 'function') { window.no2chat.open({ intent: 'start_trial' }); ack = true; }
-            else if (window.No2Chat && typeof window.No2Chat.open === 'function') { window.No2Chat.open({ intent: 'start_trial' }); ack = true; }
-            else if (window.ChatWidget && typeof window.ChatWidget.open === 'function') { window.ChatWidget.open({ intent: 'start_trial' }); ack = true; }
-            // Dispatch a custom event for your widget to listen to
-            window.dispatchEvent(new CustomEvent('no2chat:startTrial', { detail: { intent: 'start_trial' }}));
-            // Also broadcast via postMessage
-            window.postMessage({ type: 'no2chat:startTrial', intent: 'start_trial' }, '*');
-            // Try any element hooks
-            const hook = document.querySelector('[data-open-chat],[data-chat-open],[data-no2-open]');
-            if (hook) { hook.click(); ack = true; }
-          } catch (err) {}
-          // Fallback to email if no acknowledgement after a short delay
-          setTimeout(() => { if (!ack) window.location.href = MAILTO; }, 500);
-        });
+      if (!btn) return;
+      function openChat(){
+        let handled = false;
+        try {
+          if (window.no2chat && typeof window.no2chat.open === 'function') { window.no2chat.open({ intent: 'start_trial' }); handled = true; }
+          else if (window.No2Chat && typeof window.No2Chat.open === 'function') { window.No2Chat.open({ intent: 'start_trial' }); handled = true; }
+          else if (window.ChatWidget && typeof window.ChatWidget.open === 'function') { window.ChatWidget.open({ intent: 'start_trial' }); handled = true; }
+          // Emit events for widget listeners
+          window.dispatchEvent(new CustomEvent('no2chat:startTrial', { detail: { intent: 'start_trial' }}));
+          window.postMessage({ type: 'no2chat:startTrial', intent: 'start_trial' }, '*');
+          const hook = document.querySelector('[data-open-chat],[data-chat-open],[data-no2-open]');
+          if (hook) { hook.click(); handled = true; }
+        } catch (e) {}
+        // Update aria state if opened
+        if (handled) btn.setAttribute('aria-expanded', 'true');
       }
+      btn.addEventListener('click', function(e){ e.preventDefault(); openChat(); });
     })();
 
     document.getElementById('y').textContent = new Date().getFullYear();
