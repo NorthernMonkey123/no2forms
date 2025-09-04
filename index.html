@@ -46,6 +46,7 @@
         <a class="hover:text-white transition" href="#how">How it works</a>
         <a class="hover:text-white transition" href="#pricing">Pricing</a>
         <a class="hover:text-white transition" href="#faq">FAQ</a>
+        <a class="hover:text-white transition" href="poll.html">Poll</a>
         <a class="hover:text-white transition" href="#cta">Get started</a>
       </nav>
     </div>
@@ -259,15 +260,21 @@
     })();
 
     // Wire CTA buttons to open chat widget
-    function openChat(){
-      if(window.No2FormsChat){
-        window.No2FormsChat.open();
-      } else {
-        alert('Chat widget not loaded yet.');
+    // Note: handled separately for start-trial-chat via the script above. Here we only wire the pricing CTA.
+    (function(){
+      const pricingBtn = document.getElementById('open-chat-cta-pricing');
+      if (pricingBtn) {
+        pricingBtn.addEventListener('click', function(){
+          // Trigger the same chat opening logic as the main CTA
+          const evt = new CustomEvent('no2chat:startTrial', { detail: { intent: 'start_trial' } });
+          window.dispatchEvent(evt);
+          window.postMessage({ type: 'no2chat:startTrial', intent: 'start_trial' }, '*');
+          // Also click the floating button if available
+          const fab = document.querySelector('.n2f-fab');
+          if (fab) fab.click();
+        });
       }
-    }
-    document.getElementById('open-chat-cta').addEventListener('click', openChat);
-    document.getElementById('open-chat-cta-pricing').addEventListener('click', openChat);
+    })();
   </script>
 
   <script src="/chat-widget.js" defer></script>
