@@ -3,7 +3,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST" });
 
   try {
-    const { email, time, name, notes } = req.body || {};
+    const { email, time, name, notes, isoKey } = req.body || {};
     if (!email || !time) {
       return res.status(400).json({ ok: false, error: "missing_fields" });
     }
@@ -31,16 +31,50 @@ export default async function handler(req, res) {
     } catch {
       bookings = [];
     }
-    // Normalise the time string: lowercase and remove all whitespace and dash/ndash/emdash
+    // Determine a unique key for the booking.
+    // 1. Prefer isoKey if provided by the client (computed from the date & start time when using the mini picker).
+    // 2. Otherwise, try to parse the "time" string into an ISO timestamp using the Date constructor. Many browser
+    //    and Node runtimes understand common date formats (e.g. "15 Dec 14:00", "2025‑12‑15 14:00"). If parsing
+    //    succeeds, trim to minutes (YYYY-MM-DDTHH:MM) to act as the key. This helps deduplicate bookings even
+    //    when users type times manually.
+    // 3. As a last resort, normalise the raw time string by stripping whitespace, dashes and punctuation.
     const normalise = (str) => String(str || '')
       .toLowerCase()
-      .replace(/[\s\u2013\u2014-]/g, '');
-    const timeKey = normalise(time);
-    const exists = bookings.find((b) => normalise(b.time) === timeKey);
+      .replace(/\s+/g, '')          // remove all whitespace
+      .replace(/[\u2013\u2014\-]/g, '') // remove en/em dashes and hyphens
+      .replace(/[–—]/g, '')          // double safety for different dash chars
+      .replace(/[:.,]/g, '');        // strip common punctuation
+    const parseToIsoKey = (str) => {
+      try {
+        const d = new Date(str);
+        if (!isNaN(d)) {
+          // toISOString returns in UTC; slice to get YYYY-MM-DDTHH:MM
+          return d.toISOString().slice(0, 16).toLowerCase();
+        }
+      } catch {}
+      return null;
+    };
+    let key;
+    if (isoKey) {
+      key = String(isoKey).toLowerCase();
+    } else {
+      const parsed = parseToIsoKey(time);
+      key = parsed || normalise(time);
+    }
+    const exists = bookings.find((b) => {
+      let bKey;
+      if (b.isoKey) {
+        bKey = String(b.isoKey).toLowerCase();
+      } else {
+        const parsed = parseToIsoKey(b.time);
+        bKey = parsed || normalise(b.time);
+      }
+      return bKey === key;
+    });
     if (exists) {
       return res.status(200).json({ ok: false, error: 'slot_unavailable' });
     }
-    bookings.push({ email, time, name: name || '', notes: notes || '' });
+    bookings.push({ email, time, name: name || '', notes: notes || '', isoKey: isoKey || '' });
     try {
       await fs.writeFile(file, JSON.stringify(bookings, null, 2), 'utf8');
     } catch (err) {
