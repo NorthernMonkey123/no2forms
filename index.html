@@ -41,7 +41,7 @@
         <div class="h-9 w-9 rounded-2xl bg-gradient-to-br from-fuchsia-500 to-indigo-500 shadow-lg"></div>
         <span class="text-lg font-semibold tracking-tight">no2forms</span>
       </a>
-      <nav class="hidden md:flex items-center gap-6 text-sm text-zinc-300">
+      <nav class="flex flex-wrap items-center gap-4 text-sm text-zinc-300 mt-4 md:mt-0">
         <a class="hover:text-white transition" href="#benefits">Benefits</a>
         <a class="hover:text-white transition" href="#how">How it works</a>
         <a class="hover:text-white transition" href="#pricing">Pricing</a>
@@ -80,10 +80,10 @@
             Start 14-day trial in chat
           </button>
           <a href="#how" class="inline-flex items-center justify-center rounded-2xl px-6 py-3 text-base font-medium border border-zinc-700/70 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-900/40 transition focus-ring">See how it works</a>
+          <a href="poll.html" class="inline-flex items-center justify-center rounded-2xl px-6 py-3 text-base font-medium border border-zinc-700/70 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-900/40 transition focus-ring">Take the poll</a>
         </div>
         <p class="mt-3 text-xs text-zinc-400">Prefer email? <a class="underline decoration-zinc-600 hover:text-white" href="mailto:hello@no2forms.com?subject=Start%2014-day%20trial&body=Hi%2C%20I%E2%80%99d%20like%20to%20try%20no2forms.">Start by email</a></p>
         <p class="mt-2 text-xs text-zinc-400">14-day trial • Then £30/month • Cancel anytime</p>
-        <p class="mt-2 text-xs text-zinc-400">Just here for fun? <a class="underline decoration-zinc-600 hover:text-white" href="poll.html">Take our poll</a></p>
       </div>
     </section>
 
@@ -131,6 +131,21 @@
             <h3 class="font-semibold">Plug-and-play</h3>
             <p class="mt-2 text-zinc-300">Works with Gmail, Slack, Calendly/Cal.com, and your CRM via email or webhook.</p>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Booking schedule via Google Calendar -->
+    <section id="booking" class="px-6">
+      <div class="mx-auto max-w-6xl py-16">
+        <h2 class="text-2xl sm:text-3xl font-bold text-center">Check our availability</h2>
+        <p class="mt-4 text-zinc-300 text-center">Book a time with us directly through our live Google Calendar. Only free slots are shown, so you never double‑book.</p>
+        <div class="mt-8 overflow-hidden rounded-lg shadow-lg border border-zinc-800/60">
+          <iframe
+            src="https://calendar.google.com/calendar/embed?src=basicmonkey123%40gmail.com&ctz=Europe%2FLondon"
+            style="border:0" width="100%" height="600" frameborder="0" scrolling="no"
+            loading="lazy"
+            aria-label="no2forms booking calendar"></iframe>
         </div>
       </div>
     </section>
