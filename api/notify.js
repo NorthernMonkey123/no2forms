@@ -31,8 +31,12 @@ export default async function handler(req, res) {
     } catch {
       bookings = [];
     }
-    const timeKey = String(time).trim().toLowerCase();
-    const exists = bookings.find((b) => String(b.time).trim().toLowerCase() === timeKey);
+    // Normalise the time string: lowercase and remove all whitespace and dash/ndash/emdash
+    const normalise = (str) => String(str || '')
+      .toLowerCase()
+      .replace(/[\s\u2013\u2014-]/g, '');
+    const timeKey = normalise(time);
+    const exists = bookings.find((b) => normalise(b.time) === timeKey);
     if (exists) {
       return res.status(200).json({ ok: false, error: 'slot_unavailable' });
     }
