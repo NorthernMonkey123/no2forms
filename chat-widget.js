@@ -187,15 +187,45 @@
           notes: "Collected via AI agent flow on no2forms.com",
         }),
       });
-      if (nres.ok) {
+      let data = {};
+      try {
+        data = await nres.json();
+      } catch {}
+      if (data && data.ok) {
         appendMsg("✅ All set — I’ve sent the details. You’ll get a confirmation shortly. Anything else I can help with?", "bot");
+        // reset state after successful booking
+        state = State.IDLE;
+        slots = { email:"", time:"", name:"" };
+        removePicker();
+      } else if (data && data.error === 'slot_unavailable') {
+        // Requested time slot is already booked; ask for another
+        appendMsg("That time isn’t available — please choose another slot.", "bot");
+        // Clear the stored time so we prompt again
+        slots.time = "";
+        // reopen the picker for the user to select a new time
+        showTimePicker({
+          onConfirm: async (label) => {
+            slots.time = label;
+            // Immediately call notify again with updated slots
+            await notifyAndReset({ email: slots.email, time: slots.time, name: slots.name });
+          },
+          onCancel: () => {
+            appendMsg("No worries — booking cancelled. How else can I help?", "bot");
+            state = State.IDLE;
+            slots = { email:"", time:"", name:"" };
+            removePicker();
+          }
+        });
       } else {
+        // Generic failure
         appendMsg("I couldn’t log that automatically, but I’ve saved your details and we’ll follow up by email.", "bot");
+        state = State.IDLE;
+        slots = { email:"", time:"", name:"" };
+        removePicker();
       }
     } catch (err) {
       console.error("notify error", err);
       appendMsg("I hit a hiccup sending the booking, but your details are captured. We’ll confirm by email.", "bot");
-    } finally {
       state = State.IDLE;
       slots = { email:"", time:"", name:"" };
       removePicker();
