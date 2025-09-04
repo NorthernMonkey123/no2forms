@@ -140,8 +140,11 @@
       if (!d || !s) { appendMsg("Please choose a date and start time.", "bot"); return; }
       const end = addMinutes(s, dur);
       const label = `${weekdayAndDM(d)}, ${s}–${end} UK`;
+      // Compose an ISO-like key for duplicate detection (YYYY-MM-DDTHH:MM)
+      const isoKey = `${d}T${s}`;
       removePicker();
-      opts?.onConfirm?.(label);
+      // Pass both the label and isoKey to the caller
+      opts?.onConfirm?.({ label, isoKey });
     });
     cancelBtn.addEventListener("click", () => {
       removePicker();
@@ -153,7 +156,7 @@
   const history = []; // messages for LLM: [{role:"user"|"assistant", content:"..."}]
   const State = { IDLE:"idle", BOOKING:"booking" };
   let state = State.IDLE;
-  let slots = { email:"", time:"", name:"" }; // local mirror of server "slots"
+  let slots = { email:"", time:"", name:"", isoKey:"" }; // local mirror of server "slots"
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
   // ---------- API calls ----------
@@ -184,6 +187,7 @@
           email: finalSlots.email || slots.email,
           time: finalSlots.time || slots.time,
           name: finalSlots.name || slots.name || "",
+          isoKey: finalSlots.isoKey || slots.isoKey || undefined,
           notes: "Collected via AI agent flow on no2forms.com",
         }),
       });
@@ -195,7 +199,7 @@
         appendMsg("✅ All set — I’ve sent the details. You’ll get a confirmation shortly. Anything else I can help with?", "bot");
         // reset state after successful booking
         state = State.IDLE;
-        slots = { email:"", time:"", name:"" };
+        slots = { email:"", time:"", name:"", isoKey:"" };
         removePicker();
       } else if (data && data.error === 'slot_unavailable') {
         // Requested time slot is already booked; ask for another
@@ -204,15 +208,17 @@
         slots.time = "";
         // reopen the picker for the user to select a new time
         showTimePicker({
-          onConfirm: async (label) => {
+          onConfirm: async ({ label, isoKey }) => {
+            // Update both human-friendly label and isoKey when user selects a new time
             slots.time = label;
+            slots.isoKey = isoKey;
             // Immediately call notify again with updated slots
-            await notifyAndReset({ email: slots.email, time: slots.time, name: slots.name });
+            await notifyAndReset({ email: slots.email, time: slots.time, name: slots.name, isoKey: slots.isoKey });
           },
           onCancel: () => {
             appendMsg("No worries — booking cancelled. How else can I help?", "bot");
             state = State.IDLE;
-            slots = { email:"", time:"", name:"" };
+            slots = { email:"", time:"", name:"", isoKey:"" };
             removePicker();
           }
         });
@@ -220,14 +226,14 @@
         // Generic failure
         appendMsg("I couldn’t log that automatically, but I’ve saved your details and we’ll follow up by email.", "bot");
         state = State.IDLE;
-        slots = { email:"", time:"", name:"" };
+        slots = { email:"", time:"", name:"", isoKey:"" };
         removePicker();
       }
     } catch (err) {
       console.error("notify error", err);
       appendMsg("I hit a hiccup sending the booking, but your details are captured. We’ll confirm by email.", "bot");
       state = State.IDLE;
-      slots = { email:"", time:"", name:"" };
+      slots = { email:"", time:"", name:"", isoKey:"" };
       removePicker();
     }
   }
@@ -243,7 +249,7 @@
     // cancel booking flow
     if (/^\s*cancel\s*$/i.test(text) && state === State.BOOKING) {
       state = State.IDLE;
-      slots = { email:"", time:"", name:"" };
+      slots = { email:"", time:"", name:"", isoKey:"" };
       removePicker();
       appendMsg("Booking cancelled. How else can I help?", "bot");
       return;
@@ -278,8 +284,10 @@
         if (agent.missing === "time" && !slots.time) {
           // Show mini picker to supply time deterministically
           showTimePicker({
-            onConfirm: async (label) => {
+            onConfirm: async ({ label, isoKey }) => {
+              // Store both the display label and iso key for duplicate detection
               slots.time = label;
+              slots.isoKey = isoKey;
               history.push({ role: "user", content: `Time chosen: ${label}` });
               const follow = await askAgent();
               if (follow.reply) {
@@ -288,13 +296,14 @@
               }
               const s = follow.slots || slots;
               if (follow.missing === null && (s.email || slots.email) && (s.time || slots.time)) {
-                await notifyAndReset(s);
+                // include isoKey when notifying
+                await notifyAndReset({ email: s.email || slots.email, time: s.time || slots.time, name: s.name || slots.name, isoKey: slots.isoKey });
               }
             },
             onCancel: () => {
               appendMsg("No worries — booking cancelled. How else can I help?", "bot");
               state = State.IDLE;
-              slots = { email:"", time:"", name:"" };
+              slots = { email:"", time:"", name:"", isoKey:"" };
             }
           });
           return;
