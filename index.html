@@ -210,16 +210,29 @@
       function openChat(){
         let handled = false;
         try {
+          // Preferred: your widget global(s)
           if (window.no2chat && typeof window.no2chat.open === 'function') { window.no2chat.open({ intent: 'start_trial' }); handled = true; }
           else if (window.No2Chat && typeof window.No2Chat.open === 'function') { window.No2Chat.open({ intent: 'start_trial' }); handled = true; }
           else if (window.ChatWidget && typeof window.ChatWidget.open === 'function') { window.ChatWidget.open({ intent: 'start_trial' }); handled = true; }
+
+          // Directly click the FAB if present (matches your widget)
+          const fab = document.querySelector('.n2f-fab');
+          if (fab) { fab.click(); handled = true; }
+
           // Emit events for widget listeners
           window.dispatchEvent(new CustomEvent('no2chat:startTrial', { detail: { intent: 'start_trial' }}));
           window.postMessage({ type: 'no2chat:startTrial', intent: 'start_trial' }, '*');
+
+          // Try any DOM hook attributes
           const hook = document.querySelector('[data-open-chat],[data-chat-open],[data-no2-open]');
           if (hook) { hook.click(); handled = true; }
+
+          // After opening, gently prefill the input so users know what to type
+          setTimeout(() => {
+            const input = document.querySelector('.n2f-panel .n2f-input input');
+            if (input) { input.value = 'Start trial'; input.focus(); }
+          }, 150);
         } catch (e) {}
-        // Update aria state if opened
         if (handled) btn.setAttribute('aria-expanded', 'true');
       }
       btn.addEventListener('click', function(e){ e.preventDefault(); openChat(); });
