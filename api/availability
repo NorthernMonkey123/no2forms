@@ -1,0 +1,94 @@
+// api/availability.js
+//
+// Return available booking slots for the next N days.
+// This endpoint generates a simple availability schedule based off a predefined
+// daily template and excludes any times that have already been booked.
+// It reads existing bookings from the same JSON file used by notify.js.
+//
+// GET parameters:
+//   days: optional integer (default 7) – number of days ahead (including today)
+//   startHour: optional integer (default 9) – start hour (24h format)
+//   endHour: optional integer (default 17) – end hour (inclusive, 24h)
+//   interval: optional integer (default 60) – minutes between slots
+//
+// Response format:
+//   {
+//     days: [
+//       { date: 'YYYY-MM-DD', times: ['HH:MM', ...] },
+//       ...
+//     ]
+//   }
+
+export default async function handler(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const fs = await import('fs/promises');
+  const path = await import('path');
+
+  // Parse query params
+  const days = Math.min(parseInt(req.query.days) || 7, 30);
+  const startHour = Math.min(Math.max(parseInt(req.query.startHour) || 9, 0), 23);
+  const endHour = Math.min(Math.max(parseInt(req.query.endHour) || 17, startHour), 23);
+  const interval = Math.max(parseInt(req.query.interval) || 60, 15);
+
+  // Load existing bookings to exclude
+  let bookedKeys = new Set();
+  try {
+    const dataDir = path.join(process.cwd(), 'data');
+    const file = path.join(dataDir, 'bookings.json');
+    const json = await fs.readFile(file, 'utf8');
+    const bookings = JSON.parse(json);
+    // Build a set of ISO keys (YYYY-MM-DDTHH:MM) for booked slots
+    for (const b of bookings) {
+      // Use isoKey if stored, else derive from time string
+      let key;
+      if (b.isoKey) {
+        key = String(b.isoKey).toLowerCase();
+      } else if (b.time) {
+        const d = new Date(b.time);
+        if (!isNaN(d)) {
+          key = d.toISOString().slice(0, 16).toLowerCase();
+        } else {
+          // Fallback: normalise by removing whitespace/dashes/punctuation
+          key = String(b.time)
+            .toLowerCase()
+            .replace(/\s+/g, '')
+            .replace(/[\u2013\u2014\-]/g, '')
+            .replace(/[–—]/g, '')
+            .replace(/[:.,]/g, '');
+        }
+      }
+      if (key) bookedKeys.add(key);
+    }
+  } catch {
+    // ignore errors; treat as no bookings
+  }
+
+  const results = [];
+  const now = new Date();
+  // Start from today (local timezone). We'll generate days forward.
+  for (let i = 0; i < days; i++) {
+    const date = new Date(now);
+    date.setDate(now.getDate() + i);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+    const times = [];
+    for (let h = startHour; h <= endHour; h++) {
+      for (let m = 0; m < 60; m += interval) {
+        const hh = String(h).padStart(2, '0');
+        const mm2 = String(m).padStart(2, '0');
+        const key = `${dateStr}T${hh}:${mm2}`.toLowerCase();
+        if (!bookedKeys.has(key)) {
+          times.push(`${hh}:${mm2}`);
+        }
+      }
+    }
+    results.push({ date: dateStr, times });
+  }
+
+  return res.status(200).json({ days: results });
+}
