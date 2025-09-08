@@ -250,7 +250,7 @@
         data = await nres.json();
       } catch {}
       if (data && data.ok) {
-        appendMsg("✅ All set — I’ve sent the details. You’ll get a confirmation shortly. Anything else I can help with?", "bot");
+        appendMsg("You're all booked! Is there anything else I can help you with today?", "bot"); setTimeout(() => { panel.style.display = "none"; }, 1200);
         // reset state after successful booking
         state = State.IDLE;
         slots = { email:"", time:"", name:"", isoKey:"" };
@@ -268,9 +268,7 @@
             slots.isoKey = isoKey;
             // Immediately call notify again with updated slots
             await notifyAndReset({ email: slots.email, time: slots.time, name: slots.name, isoKey: slots.isoKey });
-          }
-              appendMsg("You're all booked! Is there anything else I can help you with today?", "bot"); setTimeout(() => { panel.style.display = "none"; }, 1200);
-            },
+          },
           onCancel: () => {
             appendMsg("No worries — booking cancelled. How else can I help?", "bot");
             state = State.IDLE;
@@ -344,9 +342,6 @@
           return;
         }
         if (agent.missing === "time" && !slots.time) {
-          appendHtml('Choose a time: <a href="#" class="n2f-book-link">Open calendar in a new tab</a>.', 'bot');
-          return;
-
           // Before prompting for a time, fetch and display available slots to the user.
           const availability = await fetchAvailability();
           if (Array.isArray(availability) && availability.length > 0) {
@@ -383,8 +378,6 @@
                 // include isoKey when notifying
                 await notifyAndReset({ email: s.email || slots.email, time: s.time || slots.time, name: s.name || slots.name, isoKey: slots.isoKey });
               }
-              appendMsg("You're all booked! Is there anything else I can help you with today?", "bot"); setTimeout(() => { panel.style.display = "none"; }, 1200);
-            }
             },
             onCancel: () => {
               appendMsg("No worries — booking cancelled. How else can I help?", "bot");
@@ -452,7 +445,5 @@
     }
     // If email already collected, proceed to notify and reset
     await notifyAndReset({ email: slots.email, time: slots.time, name: slots.name || '', isoKey: isoKey });
-  }
-              appendMsg("You're all booked! Is there anything else I can help you with today?", "bot"); setTimeout(() => { panel.style.display = "none"; }, 1200);
-            });
+  });
 })();
