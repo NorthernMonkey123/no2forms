@@ -55,11 +55,6 @@
   `;
   document.body.appendChild(fab);
   document.body.appendChild(panel);
-  panel.addEventListener("click", (e) => {
-    const a = e.target.closest("a.n2f-book-link");
-    if (a) { e.preventDefault(); showCalendlyInline(); }
-  });
-
 
   const closeBtn = panel.querySelector(".n2f-close");
   const messages = panel.querySelector(".n2f-messages");
@@ -75,7 +70,10 @@
     messages.scrollTop = messages.scrollHeight;
     return div;
   };
-  // ---------- HTML message helper ----------
+  // ---------- Booking helpers (new-tab flow) ----------
+  const CALENDLY_URL = "https://calendly.com/basicmonkey321/30min";
+  let awaitingBooking = false;
+
   const appendHtml = (html, who) => {
     const div = document.createElement("div");
     div.className = `n2f-msg ${who === "user" ? "n2f-user" : "n2f-bot"}`;
@@ -85,58 +83,30 @@
     return div;
   };
 
-  // ---------- Calendly inline embed ----------
-  const CALENDLY_URL = "https://calendly.com/basicmonkey321/30min";
-  function ensureCalendlyAssets() {
-    return new Promise((resolve) => {
-      function done() {
-        if (window.Calendly && typeof window.Calendly.initInlineWidget === "function") resolve();
-      }
-      if (window.Calendly && typeof window.Calendly.initInlineWidget === "function") return resolve();
-      if (!document.querySelector('link[href="https://assets.calendly.com/assets/external/widget.css"]')) {
-        const l = document.createElement("link");
-        l.rel = "stylesheet";
-        l.href = "https://assets.calendly.com/assets/external/widget.css";
-        document.head.appendChild(l);
-      }
-      let s = document.querySelector('script[src="https://assets.calendly.com/assets/external/widget.js"]');
-      if (!s) {
-        s = document.createElement("script");
-        s.async = true;
-        s.type = "text/javascript";
-        s.src = "https://assets.calendly.com/assets/external/widget.js";
-        s.onload = done;
-        document.head.appendChild(s);
-      }
-      if (s && s.readyState === "complete") done();
-      const t = setInterval(() => { if (window.Calendly) { clearInterval(t); done(); } }, 50);
-    });
+  function openCalendlyNewTab() {
+    try {
+      window.open(CALENDLY_URL, "_blank", "noopener");
+      awaitingBooking = true;
+      appendHtml('I opened Calendly in a new tab. When you\'re done, <a href="#" class="n2f-done-booking">tap here</a> and I\'ll tidy up.', 'bot');
+    } catch (e) {
+      appendMsg("I couldn't open the calendar automatically — your browser may have blocked popups. Please use this link: " + CALENDLY_URL, "bot");
+    }
   }
 
-  function showCalendlyInline() {
-    ensureCalendlyAssets().then(() => {
-      const existing = panel.querySelector(".n2f-calendly-wrap");
-      if (existing && existing.parentNode) existing.parentNode.remove();
+  window.addEventListener("focus", () => {
+    if (awaitingBooking) {
+      awaitingBooking = false;
+      appendMsg("You're all booked! Is there anything else I can help you with today?", "bot");
+      setTimeout(() => { panel.style.display = "none"; }, 1200);
+    }
+  });
 
-      const wrap = document.createElement("div");
-      wrap.className = "n2f-msg n2f-bot n2f-calendly-wrap";
-      wrap.style.padding = "0";
-
-      const mount = document.createElement("div");
-      mount.style.minWidth = "280px";
-      mount.style.height = "700px";
-      wrap.appendChild(mount);
-      messages.appendChild(wrap);
-      messages.scrollTop = messages.scrollHeight;
-
-      window.Calendly.initInlineWidget({
-        url: CALENDLY_URL,
-        parentElement: mount,
-        prefill: {},
-        utm: {}
-      });
-    });
-  }
+  panel.addEventListener("click", (e) => {
+    const book = e.target.closest("a.n2f-book-link");
+    if (book) { e.preventDefault(); openCalendlyNewTab(); return; }
+    const done = e.target.closest("a.n2f-done-booking");
+    if (done) { e.preventDefault(); awaitingBooking = false; appendMsg("You're all booked! Is there anything else I can help you with today?", "bot"); setTimeout(() => { panel.style.display = "none"; }, 1200); }
+  });
 
 
   // ---------- Mini date/time picker ----------
@@ -298,7 +268,9 @@
             slots.isoKey = isoKey;
             // Immediately call notify again with updated slots
             await notifyAndReset({ email: slots.email, time: slots.time, name: slots.name, isoKey: slots.isoKey });
-          },
+          }
+              appendMsg("You're all booked! Is there anything else I can help you with today?", "bot"); setTimeout(() => { panel.style.display = "none"; }, 1200);
+            },
           onCancel: () => {
             appendMsg("No worries — booking cancelled. How else can I help?", "bot");
             state = State.IDLE;
@@ -328,9 +300,9 @@
     if (!text) return;
 
     appendMsg(text, "user");
-    // If user asks to book, offer inline Calendly link
+    // If user asks to book, offer a new-tab Calendly link
     if (/\b(book|booking|schedule|meeting|appointment)\b/i.test(text)) {
-      appendHtml('I can help you book. <a href="#" class="n2f-book-link">Open calendar</a>.', 'bot');
+      appendHtml('Great — I can set that up. <a href="#" class="n2f-book-link">Open calendar in a new tab</a>.', 'bot');
       return;
     }
 
@@ -372,7 +344,7 @@
           return;
         }
         if (agent.missing === "time" && !slots.time) {
-          appendHtml('Choose a time: <a href="#" class="n2f-book-link">Open calendar</a>.', 'bot');
+          appendHtml('Choose a time: <a href="#" class="n2f-book-link">Open calendar in a new tab</a>.', 'bot');
           return;
 
           // Before prompting for a time, fetch and display available slots to the user.
@@ -411,6 +383,8 @@
                 // include isoKey when notifying
                 await notifyAndReset({ email: s.email || slots.email, time: s.time || slots.time, name: s.name || slots.name, isoKey: slots.isoKey });
               }
+              appendMsg("You're all booked! Is there anything else I can help you with today?", "bot"); setTimeout(() => { panel.style.display = "none"; }, 1200);
+            }
             },
             onCancel: () => {
               appendMsg("No worries — booking cancelled. How else can I help?", "bot");
@@ -478,5 +452,7 @@
     }
     // If email already collected, proceed to notify and reset
     await notifyAndReset({ email: slots.email, time: slots.time, name: slots.name || '', isoKey: isoKey });
-  });
+  }
+              appendMsg("You're all booked! Is there anything else I can help you with today?", "bot"); setTimeout(() => { panel.style.display = "none"; }, 1200);
+            });
 })();
