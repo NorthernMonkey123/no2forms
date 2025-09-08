@@ -34,6 +34,31 @@
   `;
   document.head.appendChild(style);
 
+  // ---------- Booking support helpers ----------
+  // State flag used to detect when the user has opened Calendly in a new tab and returned.
+  var awaitingBooking = false;
+  // URL to your Calendly booking page. Update this to your desired scheduling link.
+  const CALENDLY_URL = "https://calendly.com/basicmonkey321/30min";
+  /**
+   * Append an HTML string to the messages list. This helper allows links and other markup
+   * to be inserted into the chat. Messages will scroll to the bottom automatically.
+   * Note: this uses the `messages` element defined later in the script; it will be resolved
+   * at runtime when called.
+   * @param {string} html - HTML content to append.
+   * @param {"bot"|"user"} who - Identifier for styling the message bubble.
+   * @returns {HTMLElement} The inserted message element.
+   */
+  function appendHtml(html, who) {
+    const div = document.createElement("div");
+    div.className = `n2f-msg ${who === "user" ? "n2f-user" : "n2f-bot"}`;
+    div.innerHTML = html;
+    if (typeof messages !== "undefined" && messages) {
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+    return div;
+  }
+
   // ---------- DOM ----------
   const fab = document.createElement("button");
   fab.className = "n2f-fab";
@@ -232,26 +257,12 @@
         slots = { email:"", time:"", name:"", isoKey:"" };
         removePicker();
       } else if (data && data.error === 'slot_unavailable') {
-        // Requested time slot is already booked; ask for another
+        // Requested time slot is already booked; offer the Calendly link again so the user can pick another time.
         appendMsg("That time isn’t available — please choose another slot.", "bot");
-        // Clear the stored time so we prompt again
         slots.time = "";
-        // reopen the picker for the user to select a new time
-        showTimePicker({
-          onConfirm: async ({ label, isoKey }) => {
-            // Update both human-friendly label and isoKey when user selects a new time
-            slots.time = label;
-            slots.isoKey = isoKey;
-            // Immediately call notify again with updated slots
-            await notifyAndReset({ email: slots.email, time: slots.time, name: slots.name, isoKey: slots.isoKey });
-          },
-          onCancel: () => {
-            appendMsg("No worries — booking cancelled. How else can I help?", "bot");
-            state = State.IDLE;
-            slots = { email:"", time:"", name:"", isoKey:"" };
-            removePicker();
-          }
-        });
+        // Present a new Calendly link for the user to select an alternate time
+        appendHtml(`Please select another time: <a href="${CALENDLY_URL}" target="_blank" rel="noopener" class="n2f-book-link">📅 Open calendar</a>.`, 'bot');
+        state = State.BOOKING;
       } else {
         // Generic failure
         appendMsg("I couldn’t log that automatically, but I’ve saved your details and we’ll follow up by email.", "bot");
@@ -275,6 +286,12 @@
 
     appendMsg(text, "user");
     input.value = "";
+
+    // Offer Calendly link immediately if user expresses booking intent. This avoids the legacy picker flow.
+    if (/\b(book|booking|schedule|meeting|appointment)\b/i.test(text)) {
+      appendHtml(`Great — I can set that up. <a href="${CALENDLY_URL}" target="_blank" rel="noopener" class="n2f-book-link">📅 Open calendar</a>.`, 'bot');
+      return;
+    }
 
     // cancel booking flow
     if (/^\s*cancel\s*$/i.test(text) && state === State.BOOKING) {
@@ -312,49 +329,8 @@
           return;
         }
         if (agent.missing === "time" && !slots.time) {
-          // Before prompting for a time, fetch and display available slots to the user.
-          const availability = await fetchAvailability();
-          if (Array.isArray(availability) && availability.length > 0) {
-            // Build a simple summary of the next few available times.
-            const summaries = [];
-            for (const day of availability) {
-              if (!day.times || day.times.length === 0) continue;
-              // Show up to the first 3 available times per day for brevity
-              const examples = day.times.slice(0, 3).join(", ");
-              const more = day.times.length > 3 ? ", …" : "";
-              summaries.push(`${day.date}: ${examples}${more}`);
-            }
-            if (summaries.length > 0) {
-              appendMsg(
-                `Here are some available slots:\n${summaries.join("\n")}`,
-                "bot"
-              );
-            }
-          }
-          // Show mini picker to supply time deterministically
-          showTimePicker({
-            onConfirm: async ({ label, isoKey }) => {
-              // Store both the display label and iso key for duplicate detection
-              slots.time = label;
-              slots.isoKey = isoKey;
-              history.push({ role: "user", content: `Time chosen: ${label}` });
-              const follow = await askAgent();
-              if (follow.reply) {
-                appendMsg(follow.reply, "bot");
-                history.push({ role: "assistant", content: follow.reply });
-              }
-              const s = follow.slots || slots;
-              if (follow.missing === null && (s.email || slots.email) && (s.time || slots.time)) {
-                // include isoKey when notifying
-                await notifyAndReset({ email: s.email || slots.email, time: s.time || slots.time, name: s.name || slots.name, isoKey: slots.isoKey });
-              }
-            },
-            onCancel: () => {
-              appendMsg("No worries — booking cancelled. How else can I help?", "bot");
-              state = State.IDLE;
-              slots = { email:"", time:"", name:"", isoKey:"" };
-            }
-          });
+          // Instead of invoking the legacy time picker, offer a single Calendly link.
+          appendHtml(`Choose a time: <a href="${CALENDLY_URL}" target="_blank" rel="noopener" class="n2f-book-link">📅 Open calendar</a>.`, 'bot');
           return;
         }
         if (agent.missing === "name") {
@@ -417,6 +393,23 @@
     await notifyAndReset({ email: slots.email, time: slots.time, name: slots.name || '', isoKey: isoKey });
   });
 })();
+
+  // Close chat gracefully when the user returns from the Calendly tab. If `awaitingBooking` is true,
+  // the booking is considered complete, so we send a friendly message and hide the chat after a short delay.
+  window.addEventListener('focus', () => {
+    if (awaitingBooking) {
+      awaitingBooking = false;
+      appendMsg("You're all booked! Is there anything else I can help you with today?", "bot");
+      setTimeout(() => { panel.style.display = "none"; }, 1200);
+    }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && awaitingBooking) {
+      awaitingBooking = false;
+      appendMsg("You're all booked! Is there anything else I can help you with today?", "bot");
+      setTimeout(() => { panel.style.display = "none"; }, 1200);
+    }
+  });
 
 
   // Minimal click for the "done" confirmation
