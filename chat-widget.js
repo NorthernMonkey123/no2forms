@@ -55,6 +55,11 @@
   `;
   document.body.appendChild(fab);
   document.body.appendChild(panel);
+  panel.addEventListener("click", (e) => {
+    const a = e.target.closest("a.n2f-book-link");
+    if (a) { e.preventDefault(); showCalendlyInline(); }
+  });
+
 
   const closeBtn = panel.querySelector(".n2f-close");
   const messages = panel.querySelector(".n2f-messages");
@@ -83,40 +88,55 @@
   // ---------- Calendly inline embed ----------
   const CALENDLY_URL = "https://calendly.com/basicmonkey321/30min";
   function ensureCalendlyAssets() {
-    if (!document.querySelector('link[href="https://assets.calendly.com/assets/external/widget.css"]')) {
-      const l = document.createElement("link");
-      l.rel = "stylesheet";
-      l.href = "https://assets.calendly.com/assets/external/widget.css";
-      document.head.appendChild(l);
-    }
-    if (!document.querySelector('script[src="https://assets.calendly.com/assets/external/widget.js"]')) {
-      const s = document.createElement("script");
-      s.async = true;
-      s.type = "text/javascript";
-      s.src = "https://assets.calendly.com/assets/external/widget.js";
-      document.head.appendChild(s);
-    }
-  }
-  function showCalendlyInline() {
-    ensureCalendlyAssets();
-    const existing = panel.querySelector(".calendly-inline-widget");
-    if (existing && existing.parentNode) existing.parentNode.remove();
-    const wrap = document.createElement("div");
-    wrap.className = "n2f-msg n2f-bot";
-    const cal = document.createElement("div");
-    cal.className = "calendly-inline-widget";
-    cal.setAttribute("data-url", CALENDLY_URL);
-    cal.style.minWidth = "280px";
-    cal.style.height = "700px";
-    wrap.appendChild(cal);
-    messages.appendChild(wrap);
-    messages.scrollTop = messages.scrollHeight;
+    return new Promise((resolve) => {
+      function done() {
+        if (window.Calendly && typeof window.Calendly.initInlineWidget === "function") resolve();
+      }
+      if (window.Calendly && typeof window.Calendly.initInlineWidget === "function") return resolve();
+      if (!document.querySelector('link[href="https://assets.calendly.com/assets/external/widget.css"]')) {
+        const l = document.createElement("link");
+        l.rel = "stylesheet";
+        l.href = "https://assets.calendly.com/assets/external/widget.css";
+        document.head.appendChild(l);
+      }
+      let s = document.querySelector('script[src="https://assets.calendly.com/assets/external/widget.js"]');
+      if (!s) {
+        s = document.createElement("script");
+        s.async = true;
+        s.type = "text/javascript";
+        s.src = "https://assets.calendly.com/assets/external/widget.js";
+        s.onload = done;
+        document.head.appendChild(s);
+      }
+      if (s && s.readyState === "complete") done();
+      const t = setInterval(() => { if (window.Calendly) { clearInterval(t); done(); } }, 50);
+    });
   }
 
-  panel.addEventListener("click", (e) => {
-    const a = e.target.closest("a.n2f-book-link");
-    if (a) { e.preventDefault(); showCalendlyInline(); }
-  });
+  function showCalendlyInline() {
+    ensureCalendlyAssets().then(() => {
+      const existing = panel.querySelector(".n2f-calendly-wrap");
+      if (existing && existing.parentNode) existing.parentNode.remove();
+
+      const wrap = document.createElement("div");
+      wrap.className = "n2f-msg n2f-bot n2f-calendly-wrap";
+      wrap.style.padding = "0";
+
+      const mount = document.createElement("div");
+      mount.style.minWidth = "280px";
+      mount.style.height = "700px";
+      wrap.appendChild(mount);
+      messages.appendChild(wrap);
+      messages.scrollTop = messages.scrollHeight;
+
+      window.Calendly.initInlineWidget({
+        url: CALENDLY_URL,
+        parentElement: mount,
+        prefill: {},
+        utm: {}
+      });
+    });
+  }
 
 
   // ---------- Mini date/time picker ----------
@@ -313,79 +333,7 @@
       appendHtml('I can help you book. <a href="#" class="n2f-book-link">Open calendar</a>.', 'bot');
       return;
     }
-    // HTML message helper
-const appendHtml = (html, who) => {
-  const div = document.createElement("div");
-  div.className = `n2f-msg ${who === "user" ? "n2f-user" : "n2f-bot"}`;
-  div.innerHTML = html;
-  messages.appendChild(div);
-  messages.scrollTop = messages.scrollHeight;
-  return div;
-};
 
-// Calendly loader (waits until Calendly is ready)
-function ensureCalendlyAssets() {
-  return new Promise((resolve) => {
-    function done() {
-      if (window.Calendly && typeof window.Calendly.initInlineWidget === "function") resolve();
-    }
-    if (window.Calendly && typeof window.Calendly.initInlineWidget === "function") return resolve();
-
-    if (!document.querySelector('link[href="https://assets.calendly.com/assets/external/widget.css"]')) {
-      const l = document.createElement("link");
-      l.rel = "stylesheet";
-      l.href = "https://assets.calendly.com/assets/external/widget.css";
-      document.head.appendChild(l);
-    }
-    let s = document.querySelector('script[src="https://assets.calendly.com/assets/external/widget.js"]');
-    if (!s) {
-      s = document.createElement("script");
-      s.async = true;
-      s.type = "text/javascript";
-      s.src = "https://assets.calendly.com/assets/external/widget.js";
-      s.onload = done;
-      document.head.appendChild(s);
-    }
-    if (s && s.readyState === "complete") done();
-    const t = setInterval(() => { if (window.Calendly) { clearInterval(t); done(); } }, 50);
-  });
-}
-
-const CALENDLY_URL = "https://calendly.com/basicmonkey321/30min";
-
-// Mount Calendly inline inside the chat
-function showCalendlyInline() {
-  ensureCalendlyAssets().then(() => {
-    const existing = panel.querySelector(".n2f-calendly-wrap");
-    if (existing && existing.parentNode) existing.parentNode.remove();
-
-    const wrap = document.createElement("div");
-    wrap.className = "n2f-msg n2f-bot n2f-calendly-wrap";
-    wrap.style.padding = "0";
-
-    const mount = document.createElement("div");
-    mount.style.minWidth = "280px";
-    mount.style.height = "700px";
-    wrap.appendChild(mount);
-    messages.appendChild(wrap);
-    messages.scrollTop = messages.scrollHeight;
-
-    window.Calendly.initInlineWidget({
-      url: CALENDLY_URL,
-      parentElement: mount,
-      prefill: {},
-      utm: {}
-    });
-  });
-}
-
-// Delegate clicks from the booking link in messages
-panel.addEventListener("click", (e) => {
-  const a = e.target.closest("a.n2f-book-link");
-  if (a) { e.preventDefault(); showCalendlyInline(); }
-});
-
-    
     input.value = "";
 
     // cancel booking flow
@@ -424,11 +372,9 @@ panel.addEventListener("click", (e) => {
           return;
         }
         if (agent.missing === "time" && !slots.time) {
-          // Offer Calendly inline option instead of the mini picker
-          appendHtml('Choose a time in your calendar: <a href="#" class="n2f-book-link">Open calendar</a>.', 'bot');
-          // Skip mini picker in favor of Calendly
+          appendHtml('Choose a time: <a href="#" class="n2f-book-link">Open calendar</a>.', 'bot');
           return;
-    
+
           // Before prompting for a time, fetch and display available slots to the user.
           const availability = await fetchAvailability();
           if (Array.isArray(availability) && availability.length > 0) {
