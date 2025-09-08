@@ -70,6 +70,54 @@
     messages.scrollTop = messages.scrollHeight;
     return div;
   };
+  // ---------- HTML message helper ----------
+  const appendHtml = (html, who) => {
+    const div = document.createElement("div");
+    div.className = `n2f-msg ${who === "user" ? "n2f-user" : "n2f-bot"}`;
+    div.innerHTML = html;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+    return div;
+  };
+
+  // ---------- Calendly inline embed ----------
+  const CALENDLY_URL = "https://calendly.com/basicmonkey321/30min";
+  function ensureCalendlyAssets() {
+    if (!document.querySelector('link[href="https://assets.calendly.com/assets/external/widget.css"]')) {
+      const l = document.createElement("link");
+      l.rel = "stylesheet";
+      l.href = "https://assets.calendly.com/assets/external/widget.css";
+      document.head.appendChild(l);
+    }
+    if (!document.querySelector('script[src="https://assets.calendly.com/assets/external/widget.js"]')) {
+      const s = document.createElement("script");
+      s.async = true;
+      s.type = "text/javascript";
+      s.src = "https://assets.calendly.com/assets/external/widget.js";
+      document.head.appendChild(s);
+    }
+  }
+  function showCalendlyInline() {
+    ensureCalendlyAssets();
+    const existing = panel.querySelector(".calendly-inline-widget");
+    if (existing && existing.parentNode) existing.parentNode.remove();
+    const wrap = document.createElement("div");
+    wrap.className = "n2f-msg n2f-bot";
+    const cal = document.createElement("div");
+    cal.className = "calendly-inline-widget";
+    cal.setAttribute("data-url", CALENDLY_URL);
+    cal.style.minWidth = "280px";
+    cal.style.height = "700px";
+    wrap.appendChild(cal);
+    messages.appendChild(wrap);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  panel.addEventListener("click", (e) => {
+    const a = e.target.closest("a.n2f-book-link");
+    if (a) { e.preventDefault(); showCalendlyInline(); }
+  });
+
 
   // ---------- Mini date/time picker ----------
   let pickerEl = null;
@@ -77,6 +125,22 @@
     if (pickerEl && pickerEl.parentNode) pickerEl.parentNode.removeChild(pickerEl);
     pickerEl = null;
     input.disabled = false;
+  }
+
+  // ---------- Availability helper ----------
+  // Fetch available booking slots from the server. Returns an array of
+  // { date: 'YYYY-MM-DD', times: ['HH:MM', ...] } objects. We keep the
+  // params modest (5 days, hour interval) to reduce payload.
+  async function fetchAvailability() {
+    try {
+      const res = await fetch('/api/availability?days=5&startHour=9&endHour=17&interval=60');
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.days || [];
+    } catch (err) {
+      console.error('availability fetch error', err);
+      return [];
+    }
   }
   function pad(n){ return String(n).padStart(2,"0"); }
   function addMinutes(hhmm, minutes) {
@@ -244,6 +308,12 @@
     if (!text) return;
 
     appendMsg(text, "user");
+    // If user asks to book, offer inline Calendly link
+    if (/\b(book|booking|schedule|meeting|appointment)\b/i.test(text)) {
+      appendHtml('I can help you book. <a href="#" class="n2f-book-link">Open calendar</a>.', 'bot');
+      return;
+    }
+    
     input.value = "";
 
     // cancel booking flow
@@ -282,6 +352,30 @@
           return;
         }
         if (agent.missing === "time" && !slots.time) {
+          // Offer Calendly inline option instead of the mini picker
+          appendHtml('Choose a time in your calendar: <a href="#" class="n2f-book-link">Open calendar</a>.', 'bot');
+          // Skip mini picker in favor of Calendly
+          return;
+    
+          // Before prompting for a time, fetch and display available slots to the user.
+          const availability = await fetchAvailability();
+          if (Array.isArray(availability) && availability.length > 0) {
+            // Build a simple summary of the next few available times.
+            const summaries = [];
+            for (const day of availability) {
+              if (!day.times || day.times.length === 0) continue;
+              // Show up to the first 3 available times per day for brevity
+              const examples = day.times.slice(0, 3).join(", ");
+              const more = day.times.length > 3 ? ", …" : "";
+              summaries.push(`${day.date}: ${examples}${more}`);
+            }
+            if (summaries.length > 0) {
+              appendMsg(
+                `Here are some available slots:\n${summaries.join("\n")}`,
+                "bot"
+              );
+            }
+          }
           // Show mini picker to supply time deterministically
           showTimePicker({
             onConfirm: async ({ label, isoKey }) => {
@@ -343,4 +437,28 @@
   closeBtn.addEventListener("click", () => (panel.style.display = "none"));
   sendBtn.addEventListener("click", onSend);
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") onSend(); });
+
+  // Listen for external slot selection (e.g. from availability table)
+  window.addEventListener('no2chat:pickSlot', async (e) => {
+    const detail = e?.detail || {};
+    const label = detail.label;
+    const isoKey = detail.isoKey;
+    if (!label || !isoKey) return;
+    // Open chat if not already visible
+    if (typeof fab !== 'undefined') {
+      // Trigger fab click to open the panel if closed
+      if (panel.style.display !== 'flex') fab.click();
+    }
+    // Set booking state and slots
+    state = State.BOOKING;
+    slots.time = label;
+    slots.isoKey = isoKey;
+    // Prompt user for email if missing
+    if (!slots.email) {
+      appendMsg(`Great! You've chosen ${label}. Please enter your email to confirm.`, 'bot');
+      return;
+    }
+    // If email already collected, proceed to notify and reset
+    await notifyAndReset({ email: slots.email, time: slots.time, name: slots.name || '', isoKey: isoKey });
+  });
 })();
