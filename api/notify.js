@@ -10,11 +10,11 @@ export default async function handler(req, res) {
 
     // -----------------------------------------------------------------------------
     // Booking management
-    // We persist bookings to a local JSON file. Each entry contains the time string.
-    // If the requested time is already booked we return an error so the client can
-    // prompt the user to choose another slot. Otherwise we append and continue.
-    // Note: this is a simple in-memory solution for demonstration and should be
-    // replaced with a real calendar integration in production.
+    // In earlier iterations we attempted to prevent double‑booking by storing
+    // requested slots in a JSON file and rejecting duplicates. Now that the site
+    // uses Google Calendar’s appointment scheduling to handle availability, this
+    // endpoint simply persists the request for record‑keeping and notifies the
+    // operator via email or Slack. We do not perform any duplicate checks here.
     const fs = await import('fs/promises');
     const path = await import('path');
     const dataDir = path.join(process.cwd(), 'data');
@@ -31,13 +31,9 @@ export default async function handler(req, res) {
     } catch {
       bookings = [];
     }
-    // Determine a unique key for the booking.
-    // 1. Prefer isoKey if provided by the client (computed from the date & start time when using the mini picker).
-    // 2. Otherwise, try to parse the "time" string into an ISO timestamp using the Date constructor. Many browser
-    //    and Node runtimes understand common date formats (e.g. "15 Dec 14:00", "2025‑12‑15 14:00"). If parsing
-    //    succeeds, trim to minutes (YYYY-MM-DDTHH:MM) to act as the key. This helps deduplicate bookings even
-    //    when users type times manually.
-    // 3. As a last resort, normalise the raw time string by stripping whitespace, dashes and punctuation.
+    // Persist the booking request. We include the optional isoKey when provided.
+    // Before saving we check if the requested slot is already booked. This
+    // prevents double‑booking by comparing a normalised key for each booking.
     const normalise = (str) => String(str || '')
       .toLowerCase()
       .replace(/\s+/g, '')          // remove all whitespace
@@ -48,18 +44,17 @@ export default async function handler(req, res) {
       try {
         const d = new Date(str);
         if (!isNaN(d)) {
-          // toISOString returns in UTC; slice to get YYYY-MM-DDTHH:MM
           return d.toISOString().slice(0, 16).toLowerCase();
         }
       } catch {}
       return null;
     };
-    let key;
+    let requestedKey;
     if (isoKey) {
-      key = String(isoKey).toLowerCase();
+      requestedKey = String(isoKey).toLowerCase();
     } else {
       const parsed = parseToIsoKey(time);
-      key = parsed || normalise(time);
+      requestedKey = parsed || normalise(time);
     }
     const exists = bookings.find((b) => {
       let bKey;
@@ -69,9 +64,10 @@ export default async function handler(req, res) {
         const parsed = parseToIsoKey(b.time);
         bKey = parsed || normalise(b.time);
       }
-      return bKey === key;
+      return bKey === requestedKey;
     });
     if (exists) {
+      // Slot already taken. Inform client so they can prompt user to pick a different time.
       return res.status(200).json({ ok: false, error: 'slot_unavailable' });
     }
     bookings.push({ email, time, name: name || '', notes: notes || '', isoKey: isoKey || '' });
