@@ -55,6 +55,20 @@
   `;
   document.body.appendChild(fab);
   document.body.appendChild(panel);
+  // Mark booking intent on link click without blocking default navigation
+  panel.addEventListener('click', (e) => {
+    const a = e.target.closest('a.n2f-book-link');
+    if (!a) return;
+    // Capture happens before default navigation; avoid heavy work here
+    awaitingBooking = true;
+    // Defer helper UI to next frame (and avoid duplicates)
+    requestAnimationFrame(() => {
+      if (!panel.querySelector('.n2f-done-booking')) {
+        appendHtml('I opened Calendly in a new tab. When you\'re done, <a href="#" class="n2f-done-booking">tap here</a> and I\'ll tidy up.', 'bot');
+      }
+    });
+  }, { capture: true, passive: true });
+
 
   const closeBtn = panel.querySelector(".n2f-close");
   const messages = panel.querySelector(".n2f-messages");
@@ -403,3 +417,14 @@
     await notifyAndReset({ email: slots.email, time: slots.time, name: slots.name || '', isoKey: isoKey });
   });
 })();
+
+
+  // Minimal click for the "done" confirmation
+  panel.addEventListener('click', (e) => {
+    const done = e.target.closest('a.n2f-done-booking');
+    if (!done) return;
+    e.preventDefault();
+    awaitingBooking = false;
+    appendMsg("You're all booked! Is there anything else I can help you with today?", "bot");
+    setTimeout(() => { panel.style.display = "none"; }, 1200);
+  });
