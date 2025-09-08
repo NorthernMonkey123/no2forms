@@ -1,0 +1,16 @@
+
+
+/* Calendly booking link styled as button */
+.n2f-book-link {
+  display: inline-block;
+  padding: 8px 14px;
+  background: #0073e6;
+  color: #fff !important;
+  font-weight: 600;
+  border-radius: 6px;
+  text-decoration: none !important;
+  transition: background 0.2s ease;
+}
+.n2f-book-link:hover {
+  background: #005bb5;
+}
