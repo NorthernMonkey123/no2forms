@@ -70,10 +70,11 @@
     messages.scrollTop = messages.scrollHeight;
     return div;
   };
-  // ---------- Booking helpers (new-tab flow) ----------
+  // ---------- Booking helpers (new-tab, INP-friendly) ----------
   const CALENDLY_URL = "https://calendly.com/basicmonkey321/30min";
   let awaitingBooking = false;
 
+  // Lightweight HTML message helper
   const appendHtml = (html, who) => {
     const div = document.createElement("div");
     div.className = `n2f-msg ${who === "user" ? "n2f-user" : "n2f-bot"}`;
@@ -83,16 +84,7 @@
     return div;
   };
 
-  function openCalendlyNewTab() {
-    try {
-      window.open(CALENDLY_URL, "_blank", "noopener");
-      awaitingBooking = true;
-      appendHtml('I opened Calendly in a new tab. When you\'re done, <a href="#" class="n2f-done-booking">tap here</a> and I\'ll tidy up.', 'bot');
-    } catch (e) {
-      appendMsg("I couldn't open the calendar automatically — your browser may have blocked popups. Please use this link: " + CALENDLY_URL, "bot");
-    }
-  }
-
+  // When user returns to the tab, gracefully close if we were waiting
   window.addEventListener("focus", () => {
     if (awaitingBooking) {
       awaitingBooking = false;
@@ -101,11 +93,34 @@
     }
   });
 
+  // Mobile-friendly: visibility changes (e.g., switching apps)
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && awaitingBooking) {
+      awaitingBooking = false;
+      appendMsg("You're all booked! Is there anything else I can help you with today?", "bot");
+      setTimeout(() => { panel.style.display = "none"; }, 1200);
+    }
+  });
+
+  // Passive pointer listener to mark booking intent (does not block paint)
+  panel.addEventListener("pointerup", (e) => {
+    const a = e.target.closest("a.n2f-book-link");
+    if (!a) return;
+    // Mark intent and defer UI changes to next frame
+    awaitingBooking = true;
+    requestAnimationFrame(() => {
+      appendHtml('I opened Calendly in a new tab. When you\'re done, <a href="#" class="n2f-done-booking">tap here</a> and I\'ll tidy up.', 'bot');
+    });
+  }, { passive: true });
+
+  // Minimal click handler for the "done" link
   panel.addEventListener("click", (e) => {
-    const book = e.target.closest("a.n2f-book-link");
-    if (book) { e.preventDefault(); openCalendlyNewTab(); return; }
     const done = e.target.closest("a.n2f-done-booking");
-    if (done) { e.preventDefault(); awaitingBooking = false; appendMsg("You're all booked! Is there anything else I can help you with today?", "bot"); setTimeout(() => { panel.style.display = "none"; }, 1200); }
+    if (!done) return;
+    e.preventDefault();
+    awaitingBooking = false;
+    appendMsg("You're all booked! Is there anything else I can help you with today?", "bot");
+    setTimeout(() => { panel.style.display = "none"; }, 1200);
   });
 
 
@@ -298,9 +313,9 @@
     if (!text) return;
 
     appendMsg(text, "user");
-    // If user asks to book, offer a new-tab Calendly link
+    // If user asks to book, offer a real new-tab Calendly link (INP-friendly)
     if (/\b(book|booking|schedule|meeting|appointment)\b/i.test(text)) {
-      appendHtml('Great — I can set that up. <a href="#" class="n2f-book-link">Open calendar in a new tab</a>.', 'bot');
+      appendHtml('Great — I can set that up. <a href="https://calendly.com/basicmonkey321/30min" target="_blank" rel="noopener" class="n2f-book-link">Open calendar in a new tab</a>.', 'bot');
       return;
     }
 
@@ -342,6 +357,9 @@
           return;
         }
         if (agent.missing === "time" && !slots.time) {
+          appendHtml('Choose a time: <a href="https://calendly.com/basicmonkey321/30min" target="_blank" rel="noopener" class="n2f-book-link">Open calendar in a new tab</a>.', 'bot');
+          return;
+
           // Before prompting for a time, fetch and display available slots to the user.
           const availability = await fetchAvailability();
           if (Array.isArray(availability) && availability.length > 0) {
