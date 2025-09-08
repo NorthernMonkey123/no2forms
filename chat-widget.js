@@ -392,6 +392,114 @@
     // If email already collected, proceed to notify and reset
     await notifyAndReset({ email: slots.email, time: slots.time, name: slots.name || '', isoKey: isoKey });
   });
+
+// === no2forms: Google Meet booking (Calendly) ===
+(function() {
+  // Avoid duplicate injection
+  if (window.__n2fMeetInjected) return;
+  window.__n2fMeetInjected = true;
+
+  // Config: your Calendly Google Meet event URL
+  const N2F_MEET_EVENT_URL = "https://calendly.com/basicmonkey321/google-meet";
+
+  // Load Calendly widget script once
+  function ensureCalendlyScript() {
+    if (document.getElementById("calendly-widget-js")) return;
+    const s = document.createElement("script");
+    s.id = "calendly-widget-js";
+    s.src = "https://assets.calendly.com/assets/external/widget.js";
+    s.async = true;
+    document.body.appendChild(s);
+  }
+  // Load Calendly CSS once
+  function ensureCalendlyCss() {
+    if (document.getElementById("calendly-widget-css")) return;
+    const l = document.createElement("link");
+    l.id = "calendly-widget-css";
+    l.rel = "stylesheet";
+    l.href = "https://assets.calendly.com/assets/external/widget.css";
+    document.head.appendChild(l);
+  }
+
+  function openCalendlyPopup(url) {
+    const params = new URLSearchParams({
+      utm_source: "chatbot",
+      utm_medium: "website",
+      utm_campaign: "booking"
+    }).toString();
+    const full = url.includes("?") ? url + "&" + params : url + "?" + params;
+    if (window.Calendly && typeof window.Calendly.initPopupWidget === "function") {
+      window.Calendly.initPopupWidget({ url: full });
+    } else {
+      window.open(full, "_blank", "noopener,noreferrer");
+    }
+  }
+
+  function insertMeetCta() {
+    // Find the chat panel and messages container created by this widget
+    const panel = document.querySelector(".n2f-panel");
+    const messages = panel ? panel.querySelector(".n2f-messages") : null;
+    if (!panel || !messages) return;
+
+    // Prevent duplicates
+    if (messages.querySelector(".n2f-meet-cta")) return;
+
+    // Build a bot message bubble that contains the Google Meet button
+    const bubble = document.createElement("div");
+    bubble.className = "n2f-msg n2f-bot n2f-meet-cta";
+    bubble.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:8px">
+        <div>Would you like to book a <strong>Google Meet</strong> with us?</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+          <button type="button" class="n2f-btn-meet" aria-label="Book a Google Meet"
+            style="padding:.55rem .9rem; border-radius:10px; border:1px solid #111; background:#111; color:#fff; cursor:pointer">
+            🎥 Book Google Meet
+          </button>
+        </div>
+        <small style="opacity:.7">A Calendly popup will open. If it doesn’t, we’ll open a new tab.</small>
+      </div>
+    `;
+    messages.appendChild(bubble);
+    messages.scrollTop = messages.scrollHeight;
+
+    const btn = bubble.querySelector(".n2f-btn-meet");
+    btn.addEventListener("click", () => openCalendlyPopup(N2F_MEET_EVENT_URL));
+
+    // Optional: listen for Calendly booking completion
+    window.addEventListener("message", (e) => {
+      if (!e?.data || typeof e.data.event !== "string") return;
+      if (e.data.event === "calendly.event_scheduled") {
+        // Show a simple confirmation bubble
+        const ok = document.createElement("div");
+        ok.className = "n2f-msg n2f-bot";
+        ok.textContent = "You're all booked! Check your email for the Google Meet link. Anything else I can help with?";
+        messages.appendChild(ok);
+        messages.scrollTop = messages.scrollHeight;
+      }
+    }, { once: true });
+  }
+
+  // Ensure assets, then insert CTA after the widget panel is in DOM
+  ensureCalendlyCss();
+  ensureCalendlyScript();
+
+  // Try now; if panel isn't ready yet, retry shortly
+  if (document.querySelector(".n2f-panel .n2f-messages")) {
+    insertMeetCta();
+  } else {
+    const obs = new MutationObserver((list, observer) => {
+      if (document.querySelector(".n2f-panel .n2f-messages")) {
+        insertMeetCta();
+        observer.disconnect();
+      }
+    });
+    obs.observe(document.documentElement, { childList: true, subtree: true });
+    // Safety timeout
+    setTimeout(() => obs.disconnect(), 8000);
+  }
+})();
+// === /no2forms: Google Meet booking (Calendly) ===
+
 })();
 
   // Close chat gracefully when the user returns from the Calendly tab. If `awaitingBooking` is true,
