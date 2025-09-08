@@ -25,37 +25,39 @@
     .n2f-input input { flex:1; background:#0b0f16; color:#e5e7eb; border:1px solid #30363d; border-radius:8px; padding:10px; outline:none; }
     .n2f-input button { background:#2563eb; color:#fff; border:none; padding:10px 12px; border-radius:8px; cursor:pointer; }
     .n2f-input button:disabled { opacity:.6; cursor:not-allowed; }
+
+    /* mini picker */
+    .n2f-picker { margin-top: 6px; border:1px solid #30363d; background:#0b1220; padding:10px; border-radius:10px; display:grid; gap:8px; }
+    .n2f-row { display:flex; gap:8px; }
+    .n2f-picker input, .n2f-picker select, .n2f-picker button { width:100%; background:#0b0f16; color:#e5e7eb; border:1px solid #30363d; border-radius:8px; padding:8px; }
+    .n2f-actions { display:flex; gap:8px; }
   `;
   document.head.appendChild(style);
 
   // ---------- Booking support helpers ----------
-  const PHONE_EVENT_URL = "https://calendly.com/basicmonkey321/30min";
-  const MEET_EVENT_URL  = "https://calendly.com/basicmonkey321/google-meet";
-
-  function ensureCalendlyAssets() {
-    if (!document.getElementById("calendly-widget-css")) {
-      const l = document.createElement("link");
-      l.id = "calendly-widget-css";
-      l.rel = "stylesheet";
-      l.href = "https://assets.calendly.com/assets/external/widget.css";
-      document.head.appendChild(l);
+  // State flag used to detect when the user has opened Calendly in a new tab and returned.
+  var awaitingBooking = false;
+  // Define separate booking links for phone and Google Meet. These replace the single legacy Calendly URL.
+  const PHONE_URL = "https://calendly.com/basicmonkey321/30min";
+  const MEET_URL  = "https://calendly.com/basicmonkey321/google-meet";
+  /**
+   * Append an HTML string to the messages list. This helper allows links and other markup
+   * to be inserted into the chat. Messages will scroll to the bottom automatically.
+   * Note: this uses the `messages` element defined later in the script; it will be resolved
+   * at runtime when called.
+   * @param {string} html - HTML content to append.
+   * @param {"bot"|"user"} who - Identifier for styling the message bubble.
+   * @returns {HTMLElement} The inserted message element.
+   */
+  function appendHtml(html, who) {
+    const div = document.createElement("div");
+    div.className = `n2f-msg ${who === "user" ? "n2f-user" : "n2f-bot"}`;
+    div.innerHTML = html;
+    if (typeof messages !== "undefined" && messages) {
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
     }
-    if (!document.getElementById("calendly-widget-js")) {
-      const s = document.createElement("script");
-      s.id = "calendly-widget-js";
-      s.src = "https://assets.calendly.com/assets/external/widget.js";
-      s.async = true;
-      document.body.appendChild(s);
-    }
-  }
-
-  function openCalendly(url) {
-    ensureCalendlyAssets();
-    if (window.Calendly && Calendly.initPopupWidget) {
-      Calendly.initPopupWidget({ url });
-    } else {
-      window.open(url, "_blank");
-    }
+    return div;
   }
 
   // ---------- DOM ----------
@@ -79,6 +81,20 @@
   `;
   document.body.appendChild(fab);
   document.body.appendChild(panel);
+  // Mark booking intent on link click without blocking default navigation
+  panel.addEventListener('click', (e) => {
+    const a = e.target.closest('a.n2f-book-link');
+    if (!a) return;
+    // Capture happens before default navigation; avoid heavy work here
+    awaitingBooking = true;
+    // Defer helper UI to next frame (and avoid duplicates)
+    requestAnimationFrame(() => {
+      if (!panel.querySelector('.n2f-done-booking')) {
+        appendHtml('I opened Calendly in a new tab. When you\'re done, <a href="#" class="n2f-done-booking">tap here</a> and I\'ll tidy up.', 'bot');
+      }
+    });
+  }, { capture: true, passive: true });
+
 
   const closeBtn = panel.querySelector(".n2f-close");
   const messages = panel.querySelector(".n2f-messages");
@@ -95,32 +111,207 @@
     return div;
   };
 
+  // ---------- Mini date/time picker ----------
+  let pickerEl = null;
+  function removePicker() {
+    if (pickerEl && pickerEl.parentNode) pickerEl.parentNode.removeChild(pickerEl);
+    pickerEl = null;
+    input.disabled = false;
+  }
+
+  // ---------- Availability helper ----------
+  // Fetch available booking slots from the server. Returns an array of
+  // { date: 'YYYY-MM-DD', times: ['HH:MM', ...] } objects. We keep the
+  // params modest (5 days, hour interval) to reduce payload.
+  async function fetchAvailability() {
+    try {
+      const res = await fetch('/api/availability?days=5&startHour=9&endHour=17&interval=60');
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.days || [];
+    } catch (err) {
+      console.error('availability fetch error', err);
+      return [];
+    }
+  }
+  function pad(n){ return String(n).padStart(2,"0"); }
+  function addMinutes(hhmm, minutes) {
+    const [h, m] = hhmm.split(":").map(Number);
+    const total = h*60 + m + minutes;
+    const eh = Math.floor((total % (24*60))/60);
+    const em = total % 60;
+    return `${pad(eh)}:${pad(em)}`;
+  }
+  function weekdayAndDM(date) {
+    const d = new Date(date + "T00:00:00");
+    const wk = d.toLocaleDateString("en-GB", { weekday: "short" });
+    const dm = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+    return `${wk} ${dm}`;
+  }
+  function showTimePicker(opts) {
+    // opts: { onConfirm(label), onCancel() }
+    input.disabled = true;
+    const container = document.createElement("div");
+    container.className = "n2f-picker";
+
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = pad(today.getMonth() + 1);
+    const dd = pad(today.getDate());
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    container.innerHTML = `
+      <div style="font-weight:600">Pick a date & time (UK)</div>
+      <div class="n2f-row">
+        <input type="date" id="n2f-date" min="${todayStr}" value="${todayStr}">
+      </div>
+      <div class="n2f-row">
+        <input type="time" id="n2f-start" value="15:00" step="900">
+        <select id="n2f-dur">
+          <option value="30">30 min</option>
+          <option value="60" selected>60 min</option>
+          <option value="90">90 min</option>
+        </select>
+      </div>
+      <div class="n2f-actions">
+        <button id="n2f-confirm">Confirm</button>
+        <button id="n2f-cancel">Cancel</button>
+      </div>
+      <div style="font-size:12px;opacity:.8">Times assumed Europe/London (UK). Tell me another timezone if needed.</div>
+    `;
+    pickerEl = container;
+    messages.appendChild(container);
+    messages.scrollTop = messages.scrollHeight;
+
+    const dateEl = container.querySelector("#n2f-date");
+    const startEl = container.querySelector("#n2f-start");
+    const durEl = container.querySelector("#n2f-dur");
+    const confirmBtn = container.querySelector("#n2f-confirm");
+    const cancelBtn = container.querySelector("#n2f-cancel");
+
+    confirmBtn.addEventListener("click", () => {
+      const d = dateEl.value;
+      const s = startEl.value;
+      const dur = parseInt(durEl.value, 10);
+      if (!d || !s) { appendMsg("Please choose a date and start time.", "bot"); return; }
+      const end = addMinutes(s, dur);
+      const label = `${weekdayAndDM(d)}, ${s}–${end} UK`;
+      // Compose an ISO-like key for duplicate detection (YYYY-MM-DDTHH:MM)
+      const isoKey = `${d}T${s}`;
+      removePicker();
+      // Pass both the label and isoKey to the caller
+      opts?.onConfirm?.({ label, isoKey });
+    });
+    cancelBtn.addEventListener("click", () => {
+      removePicker();
+      opts?.onCancel?.();
+    });
+  }
+
   // ---------- Conversation state ----------
-  const history = [];
+  const history = []; // messages for LLM: [{role:"user"|"assistant", content:"..."}]
   const State = { IDLE:"idle", BOOKING:"booking" };
   let state = State.IDLE;
-  let slots = { email:"", time:"", name:"", isoKey:"" };
+  let slots = { email:"", time:"", name:"", isoKey:"" }; // local mirror of server "slots"
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
-  async function askAgent() {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ messages: history }),
-    });
-    return res.json();
+  // ---------- API calls ----------
+ const askAgent = async () => {
+  const res = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ messages: history }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Request failed");
+
+  // Defensive: if server is still returning legacy { reply: "..." }
+  if (typeof data?.reply === "string" && !data.mode) {
+    return { mode: "chat", reply: data.reply, missing: null, slots: { email:"", time:"", name:"" } };
+  }
+
+  return data; // expected: { mode, reply, missing, slots }
+};
+
+
+  async function notifyAndReset(finalSlots) {
+    try {
+      const nres = await fetch("/api/notify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: finalSlots.email || slots.email,
+          time: finalSlots.time || slots.time,
+          name: finalSlots.name || slots.name || "",
+          isoKey: finalSlots.isoKey || slots.isoKey || undefined,
+          notes: "Collected via AI agent flow on no2forms.com",
+        }),
+      });
+      let data = {};
+      try {
+        data = await nres.json();
+      } catch {}
+      if (data && data.ok) {
+        appendMsg("✅ All set — I’ve sent the details. You’ll get a confirmation shortly. Anything else I can help with?", "bot");
+        // reset state after successful booking
+        state = State.IDLE;
+        slots = { email:"", time:"", name:"", isoKey:"" };
+        removePicker();
+      } else if (data && data.error === 'slot_unavailable') {
+        // Requested time slot is already booked; offer the Calendly link again so the user can pick another time.
+        appendMsg("That time isn’t available — please choose another slot.", "bot");
+        slots.time = "";
+        // Offer the booking choices again so the user can pick a different option.
+        appendHtml(`Please select another time: <a href="${MEET_URL}" target="_blank" rel="noopener" class="n2f-book-link">🎥 Google Meet</a> or <a href="${PHONE_URL}" target="_blank" rel="noopener" class="n2f-book-link">📞 Phone Call</a>.`, 'bot');
+        state = State.BOOKING;
+      } else {
+        // Generic failure
+        appendMsg("I couldn’t log that automatically, but I’ve saved your details and we’ll follow up by email.", "bot");
+        state = State.IDLE;
+        slots = { email:"", time:"", name:"", isoKey:"" };
+        removePicker();
+      }
+    } catch (err) {
+      console.error("notify error", err);
+      appendMsg("I hit a hiccup sending the booking, but your details are captured. We’ll confirm by email.", "bot");
+      state = State.IDLE;
+      slots = { email:"", time:"", name:"", isoKey:"" };
+      removePicker();
+    }
   }
 
   // ---------- Send handler ----------
   const onSend = async () => {
     const text = input.value.trim();
     if (!text) return;
+
     appendMsg(text, "user");
     input.value = "";
 
+    // If the user expresses booking intent, present clear options for Google Meet or Phone. Users must click a link to proceed.
+    if (/\b(book|booking|schedule|meeting|appointment)\b/i.test(text)) {
+      appendHtml(`Great — how would you like to meet? <a href="${MEET_URL}" target="_blank" rel="noopener" class="n2f-book-link">🎥 Google Meet</a> or <a href="${PHONE_URL}" target="_blank" rel="noopener" class="n2f-book-link">📞 Phone Call</a>.`, 'bot');
+      return;
+    }
+
+    // cancel booking flow
+    if (/^\s*cancel\s*$/i.test(text) && state === State.BOOKING) {
+      state = State.IDLE;
+      slots = { email:"", time:"", name:"", isoKey:"" };
+      removePicker();
+      appendMsg("Booking cancelled. How else can I help?", "bot");
+      return;
+    }
+
+    // push user msg to history
     history.push({ role: "user", content: text });
+
     try {
-      const agent = await askAgent();
+      const agent = await askAgent(); // {mode, reply, missing, slots}
+      if (agent.slots && typeof agent.slots === "object") {
+        // merge any extracted slots (e.g., email pulled from text)
+        slots = { ...slots, ...agent.slots };
+      }
 
       if (agent.reply) {
         appendMsg(agent.reply, "bot");
@@ -128,46 +319,29 @@
       }
 
       if (agent.mode === "booking") {
+        // When the agent requests a booking, offer the meet/phone options instead of the legacy picker flow.
         state = State.BOOKING;
-        if (agent.missing === "time" && !slots.time) {
-          // 👇 Show choice between Phone and Google Meet
-          ensureCalendlyAssets();
-          const html = `
-            <div class="n2f-msg n2f-bot">
-              <div style="margin-bottom:6px">Do you prefer <strong>phone</strong> or <strong>Google Meet</strong>?</div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <button class="n2f-book-phone">📞 Phone</button>
-                <button class="n2f-book-meet">🎥 Google Meet</button>
-              </div>
-            </div>
-          `;
-          messages.insertAdjacentHTML("beforeend", html);
-          messages.scrollTop = messages.scrollHeight;
-          return;
-        }
+        appendHtml(`Great — how would you like to meet? <a href="${MEET_URL}" target="_blank" rel="noopener" class="n2f-book-link">🎥 Google Meet</a> or <a href="${PHONE_URL}" target="_blank" rel="noopener" class="n2f-book-link">📞 Phone Call</a>.`, 'bot');
+        return;
+      } else {
+        state = State.IDLE;
       }
     } catch (e) {
       console.error(e);
-      appendMsg("I’m here to help explain no2forms and book a quick call. Ask me anything — or say “book a demo”.", "bot");
+      appendMsg(
+        "I’m here to help explain no2forms and book a quick call. Ask me anything — or say “book a call” and I’ll schedule it (no forms).",
+        "bot"
+      );
+      history.push({ role: "assistant", content: "I’m here to help explain no2forms and book a quick call. Ask me anything — or say “book a call” and I’ll schedule it (no forms)." });
     }
   };
-
-  // ---------- Event delegation for booking buttons ----------
-  panel.addEventListener("click", (e) => {
-    if (e.target.closest(".n2f-book-phone")) {
-      openCalendly(PHONE_EVENT_URL);
-    }
-    if (e.target.closest(".n2f-book-meet")) {
-      openCalendly(MEET_EVENT_URL);
-    }
-  });
 
   // ---------- UI Events ----------
   fab.addEventListener("click", () => {
     panel.style.display = panel.style.display === "flex" ? "none" : "flex";
     panel.style.flexDirection = "column";
     if (panel.style.display === "flex" && messages.childElementCount === 0) {
-      const welcome = "Hi! I’m the no2forms assistant. Ask anything — or say “book a demo” and I’ll sort it.";
+      const welcome = "Hi! I’m the no2forms assistant. Ask anything — or say “book a call” and I’ll sort it (no forms). Type ‘cancel’ to exit booking.";
       appendMsg(welcome, "bot");
       history.push({ role: "assistant", content: welcome });
     }
@@ -175,4 +349,34 @@
   closeBtn.addEventListener("click", () => (panel.style.display = "none"));
   sendBtn.addEventListener("click", onSend);
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") onSend(); });
+
+  // Removed legacy slot selection handler as Calendly now handles all bookings directly.
 })();
+
+  // Close chat gracefully when the user returns from the Calendly tab. If `awaitingBooking` is true,
+  // the booking is considered complete, so we send a friendly message and hide the chat after a short delay.
+  window.addEventListener('focus', () => {
+    if (awaitingBooking) {
+      awaitingBooking = false;
+      appendMsg("You're all booked! Is there anything else I can help you with today?", "bot");
+      setTimeout(() => { panel.style.display = "none"; }, 1200);
+    }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && awaitingBooking) {
+      awaitingBooking = false;
+      appendMsg("You're all booked! Is there anything else I can help you with today?", "bot");
+      setTimeout(() => { panel.style.display = "none"; }, 1200);
+    }
+  });
+
+
+  // Minimal click for the "done" confirmation
+  panel.addEventListener('click', (e) => {
+    const done = e.target.closest('a.n2f-done-booking');
+    if (!done) return;
+    e.preventDefault();
+    awaitingBooking = false;
+    appendMsg("You're all booked! Is there anything else I can help you with today?", "bot");
+    setTimeout(() => { panel.style.display = "none"; }, 1200);
+  });
