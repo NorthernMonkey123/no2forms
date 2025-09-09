@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>No2Forms Case Study – Estate Agents</title>
+  <meta name="description" content="See how no2forms can help estate agencies capture more leads and bookings by replacing static forms with a conversational AI." />
+  <meta property="og:title" content="No2Forms Estate Agent Case Study" />
+  <meta property="og:description" content="A modern case study showing how an AI chatbot helps estate agents win more appointments and never miss a lead." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { color-scheme: light dark; }
+    html, body { height: 100%; }
+    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+    /* Simple chat demo styles */
+    .chat-container { max-width: 20rem; margin: 0 auto; padding: 1rem; border-radius: 0.75rem; background-color: rgba(24, 24, 27, 0.5); border: 1px solid rgba(63, 63, 70, 0.5); overflow: hidden; }
+    .message { margin-top: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 0.75rem; max-width: 90%; opacity: 0; transform: translateY(10px); transition: opacity 0.4s ease-out, transform 0.4s ease-out; }
+    .message.show { opacity: 1; transform: translateY(0); }
+    .message.bot { background-color: rgba(217, 70, 239, 0.2); color: rgb(240, 240, 245); align-self: flex-start; }
+    .message.user { background-color: rgba(79, 70, 229, 0.2); color: rgb(240, 240, 245); align-self: flex-end; margin-left: auto; }
+    /* End chat styles */
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-full">
+  <!-- Gradient glows -->
+  <div class="pointer-events-none fixed inset-0 -z-10">
+    <div class="absolute -top-24 left-1/2 h-[44rem] w-[44rem] -translate-x-1/2 rounded-full bg-fuchsia-500/40 blur-[80px] saturate-90 opacity-25"></div>
+    <div class="absolute top-1/3 right-1/4 h-[32rem] w-[32rem] rounded-full bg-indigo-500/40 blur-[80px] saturate-90 opacity-25"></div>
+  </div>
+
+  <!-- Header -->
+  <header class="relative">
+    <div class="mx-auto max-w-7xl px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <a href="index.html" class="flex items-center gap-3">
+        <div class="h-9 w-9 rounded-2xl bg-gradient-to-br from-fuchsia-500 to-indigo-500 shadow-lg"></div>
+        <span class="text-lg font-semibold tracking-tight">no2forms</span>
+      </a>
+      <nav class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-sm text-zinc-300 mt-4 sm:mt-0">
+        <a class="hover:text-white transition" href="index.html#benefits">Benefits</a>
+        <a class="hover:text-white transition" href="index.html#how">How it works</a>
+        <a class="hover:text-white transition" href="index.html#pricing">Pricing</a>
+        <a class="hover:text-white transition" href="index.html#faq">FAQ</a>
+        <a class="hover:text-white transition" href="poll.html">Poll</a>
+        <a class="hover:text-white transition font-semibold text-white" href="estate-case-study.html">Case study</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="px-6">
+      <div class="mx-auto max-w-5xl pt-20 pb-12 text-center">
+        <h1 class="text-3xl sm:text-5xl font-extrabold leading-tight tracking-tight">Estate Agent Chatbot Case Study</h1>
+        <p class="mt-4 text-lg sm:text-2xl text-zinc-300 max-w-3xl mx-auto">Discover how an AI chatbot helps estate agents capture more viewings, qualify leads and never miss an enquiry.</p>
+        <a href="#demo" class="mt-8 inline-flex items-center justify-center rounded-2xl px-6 py-3 text-base font-medium bg-white text-zinc-900 shadow hover:shadow-lg hover:scale-[1.01] transition focus-ring">Watch the demo</a>
+      </div>
+    </section>
+    
+    <!-- Pain Points Section -->
+    <section class="px-6" id="pain">
+      <div class="mx-auto max-w-5xl py-12">
+        <h2 class="text-2xl sm:text-3xl font-bold text-center mb-6">Why estate agents lose leads</h2>
+        <div class="grid md:grid-cols-2 gap-8">
+          <div>
+            <p class="text-zinc-300 mb-4">Most estate agencies still rely on static web forms, voicemail and email. Research shows that:</p>
+            <ul class="space-y-3 text-zinc-300 list-disc list-inside">
+              <li>Up to 40% of buyer enquiries arrive outside 9–5【370884853154220†L36-L49】【631194351245414†L59-L66】.</li>
+              <li>About 48% of sales enquiries are never answered and response times average almost 4 hours【276573271499473†L28-L49】【386887429575196†L112-L115】.</li>
+              <li>Over 85% of callers who hit voicemail never call back【370884853154220†L59-L63】.</li>
+              <li>Form completion rates are low, and almost half of real estate forms are abandoned【398580566464349†L61-L90】.</li>
+            </ul>
+            <p class="mt-4 text-zinc-400 text-sm">These numbers translate into thousands of pounds lost to missed viewings and instructions.</p>
+          </div>
+          <div class="rounded-3xl border border-zinc-800/60 bg-zinc-900/40 p-6">
+            <h3 class="font-semibold text-lg mb-3">The cost of friction</h3>
+            <p class="text-zinc-300 mb-2">Clients expect instant answers and flexible booking. When forced to fill a long form or wait for a call back, they move on.</p>
+            <p class="text-zinc-300">No2forms removes that friction with a conversational chatbot that is always on, captures details in minutes and syncs directly with your diary. Scroll down to see it in action.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Demo Section -->
+    <section class="px-6" id="demo">
+      <div class="mx-auto max-w-6xl py-12 grid md:grid-cols-2 gap-8">
+        <div class="flex flex-col justify-center">
+          <h2 class="text-2xl sm:text-3xl font-bold mb-4">Chatbot vs. Form</h2>
+          <p class="text-zinc-300 mb-4">On the left, a short conversation captures a viewing booking. On the right, traditional forms and emails leave customers waiting.</p>
+          <div class="chat-container flex flex-col" id="chat-demo">
+            <!-- Messages inserted by script -->
+          </div>
+          <p class="mt-4 text-xs text-zinc-400">This is a simulated conversation. In production, our AI tailors the dialogue to your agency’s tone and questions.</p>
+        </div>
+        <div class="rounded-3xl border border-zinc-800/60 bg-zinc-900/40 p-6 flex flex-col justify-center">
+          <h3 class="font-semibold text-lg mb-3">Why forms fall short</h3>
+          <ul class="space-y-3 text-zinc-300 list-disc list-inside">
+            <li>Clients abandon long forms on mobile.</li>
+            <li>No immediate feedback or appointment confirmation.</li>
+            <li>Enquiries sent after hours sit unanswered until the next day.</li>
+            <li>Agents waste time manually qualifying tyre‑kickers.</li>
+          </ul>
+          <p class="mt-4 text-zinc-300">With no2forms, your chatbot asks the right questions, books viewings into your calendar and ensures every lead is captured — even while you sleep.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Benefits Section -->
+    <section class="px-6" id="benefits">
+      <div class="mx-auto max-w-6xl py-12">
+        <h2 class="text-2xl sm:text-3xl font-bold text-center mb-8">How no2forms helps estate agents</h2>
+        <div class="grid md:grid-cols-3 gap-6">
+          <div class="rounded-2xl border border-zinc-800/60 p-6 bg-zinc-900/40">
+            <h3 class="font-semibold">24/7 lead capture</h3>
+            <p class="mt-2 text-zinc-300">Our bot is always on, capturing enquiries day and night so you never miss a potential viewing.【370884853154220†L36-L49】</p>
+          </div>
+          <div class="rounded-2xl border border-zinc-800/60 p-6 bg-zinc-900/40">
+            <h3 class="font-semibold">Instant qualification</h3>
+            <p class="mt-2 text-zinc-300">Collect budgets, preferred dates and buyer details automatically, so your team only speaks to serious clients.【398580566464349†L61-L90】</p>
+          </div>
+          <div class="rounded-2xl border border-zinc-800/60 p-6 bg-zinc-900/40">
+            <h3 class="font-semibold">Seamless scheduling</h3>
+            <p class="mt-2 text-zinc-300">Book viewings into your diary without back‑and‑forth. Avoid double bookings and no‑shows through automated reminders.【639223029293296†L61-L90】</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Call to action -->
+    <section class="px-6">
+      <div class="mx-auto max-w-5xl py-12 text-center">
+        <h2 class="text-2xl sm:text-3xl font-bold mb-4">Ready to capture every lead?</h2>
+        <p class="text-zinc-300 mb-6 max-w-3xl mx-auto">Start your 14‑day trial or contact us to customise the chatbot for your agency. No coding required.</p>
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <a href="index.html#cta" class="inline-flex items-center justify-center rounded-2xl px-6 py-3 text-base font-medium bg-white text-zinc-900 shadow hover:shadow-lg hover:scale-[1.01] transition focus-ring">Start free trial</a>
+          <a href="mailto:hello@no2forms.com?subject=Estate%20agent%20chatbot" class="inline-flex items-center justify-center rounded-2xl px-6 py-3 text-base font-medium border border-zinc-700/70 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-900/40 transition focus-ring">Get in touch</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="relative">
+    <div class="mx-auto max-w-7xl px-6 py-12 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-400">
+      <div>© <span id="foot-year"></span> no2forms</div>
+      <div class="flex items-center gap-4">
+        <a class="hover:text-white" href="mailto:hello@no2forms.com">Contact</a>
+        <a class="hover:text-white" href="#">Privacy</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Set year in footer
+    document.addEventListener('DOMContentLoaded', function(){ document.getElementById('foot-year').textContent = new Date().getFullYear(); });
+    // Demo chat conversation
+    const demoMessages = [
+      { sender: 'user', text: "Hi, I'm interested in booking a viewing for 123 High Street." },
+      { sender: 'bot', text: 'Great! When would you like to see the property? We have slots tomorrow at 10am, 2pm and 4pm.' },
+      { sender: 'user', text: '2pm would be ideal.' },
+      { sender: 'bot', text: 'Perfect, I\'ve booked you in for 2pm tomorrow. I\'ll send you a confirmation email now. Anything else I can help with?' },
+      { sender: 'user', text: "That's all, thanks!" },
+      { sender: 'bot', text: 'Happy to help! See you tomorrow.' },
+    ];
+    const chatContainer = document.getElementById('chat-demo');
+    function appendMessage(msg, delay){
+      setTimeout(() => {
+        const el = document.createElement('div');
+        el.classList.add('message', msg.sender);
+        el.textContent = msg.text;
+        chatContainer.appendChild(el);
+        requestAnimationFrame(() => {
+          el.classList.add('show');
+        });
+        // Scroll to bottom to keep new message visible
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }, delay);
+    }
+    let cumulative = 500; // initial delay
+    demoMessages.forEach((msg, idx) => {
+      appendMessage(msg, cumulative);
+      cumulative += 2000; // 2 seconds between messages
+    });
+  </script>
+</body>
+</html>
