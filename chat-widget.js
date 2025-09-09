@@ -8,7 +8,8 @@
       display:flex; align-items:center; justify-content:center; cursor:pointer; z-index: 99999; }
     .n2f-fab:hover { filter: brightness(1.1); }
 
-    .n2f-panel { position: fixed; right: 20px; bottom: 88px; width: 320px; max-height: 60vh;
+    .n2f-panel { position: fixed; right: 20px; bottom: 88px; width: 320px; max-height: 75vh;
+      /* Increased max-height from 60vh to 75vh so the chat feels less squashed on desktop */
       background: #0b0f16; color: #e5e7eb; border: 1px solid #30363d; border-radius: 12px;
       overflow: hidden; display: none; flex-direction: column; z-index: 99999; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
 
@@ -70,7 +71,10 @@
   panel.className = "n2f-panel";
   panel.innerHTML = `
     <div class="n2f-header">
-      <div>no2forms Assistant</div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <img src="no2formspic.jpg" alt="no2forms logo" style="height:18px;width:18px;object-fit:contain;" />
+        <span style="font-weight:600;">no2forms</span>
+      </div>
       <div class="n2f-close" title="Close">✕</div>
     </div>
     <div class="n2f-messages"></div>
